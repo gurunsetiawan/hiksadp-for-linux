@@ -1,0 +1,2 @@
+/usr/bin/ar qc libhiksadp_management.a CMakeFiles/hiksadp_management.dir/hiksadp_management_autogen/mocs_compilation.cpp.o CMakeFiles/hiksadp_management.dir/management/isapi_client.cpp.o CMakeFiles/hiksadp_management.dir/management/device_manager.cpp.o
+/usr/bin/ranlib libhiksadp_management.a

@@ -1,0 +1,106 @@
+{
+	"BUILD_DIR" : "/home/iwan/Project/hik-device-discovery/hiksadp/build/src/hiksadp_protocol_autogen",
+	"CMAKE_BINARY_DIR" : "/home/iwan/Project/hik-device-discovery/hiksadp/build",
+	"CMAKE_CURRENT_BINARY_DIR" : "/home/iwan/Project/hik-device-discovery/hiksadp/build/src",
+	"CMAKE_CURRENT_SOURCE_DIR" : "/home/iwan/Project/hik-device-discovery/hiksadp/src",
+	"CMAKE_EXECUTABLE" : "/usr/bin/cmake",
+	"CMAKE_LIST_FILES" : [ "/home/iwan/Project/hik-device-discovery/hiksadp/src/CMakeLists.txt" ],
+	"CMAKE_SOURCE_DIR" : "/home/iwan/Project/hik-device-discovery/hiksadp",
+	"DEP_FILE" : "/home/iwan/Project/hik-device-discovery/hiksadp/build/src/hiksadp_protocol_autogen/deps",
+	"DEP_FILE_RULE_NAME" : "hiksadp_protocol_autogen/timestamp",
+	"HEADERS" : 
+	[
+		[
+			"/home/iwan/Project/hik-device-discovery/hiksadp/src/protocol/sadp_discovery.hpp",
+			"MU",
+			"ULO4IMYJZC/moc_sadp_discovery.cpp",
+			null
+		],
+		[
+			"/home/iwan/Project/hik-device-discovery/hiksadp/src/protocol/sadp_packet.hpp",
+			"MU",
+			"ULO4IMYJZC/moc_sadp_packet.cpp",
+			null
+		]
+	],
+	"HEADER_EXTENSIONS" : [ "h", "hh", "h++", "hm", "hpp", "hxx", "in", "txx" ],
+	"INCLUDE_DIR" : "/home/iwan/Project/hik-device-discovery/hiksadp/build/src/hiksadp_protocol_autogen/include",
+	"MOC_COMPILATION_FILE" : "/home/iwan/Project/hik-device-discovery/hiksadp/build/src/hiksadp_protocol_autogen/mocs_compilation.cpp",
+	"MOC_DEFINITIONS" : [ "QT_CORE_LIB", "QT_NETWORK_LIB", "QT_NO_DEBUG" ],
+	"MOC_DEPEND_FILTERS" : 
+	[
+		[
+			"Q_PLUGIN_METADATA",
+			"[\n][ \t]*Q_PLUGIN_METADATA[ \t]*\\([^\\)]*FILE[ \t]*\"([^\"]+)\""
+		]
+	],
+	"MOC_INCLUDES" : 
+	[
+		"/home/iwan/Project/hik-device-discovery/hiksadp/src",
+		"/usr/include/x86_64-linux-gnu/qt6/QtNetwork",
+		"/usr/include/x86_64-linux-gnu/qt6",
+		"/usr/include/x86_64-linux-gnu/qt6/QtCore",
+		"/usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++",
+		"/usr/include/c++/14",
+		"/usr/include/x86_64-linux-gnu/c++/14",
+		"/usr/include/c++/14/backward",
+		"/usr/lib/gcc/x86_64-linux-gnu/14/include",
+		"/usr/local/include",
+		"/usr/include/x86_64-linux-gnu",
+		"/usr/include"
+	],
+	"MOC_MACRO_NAMES" : 
+	[
+		"Q_OBJECT",
+		"Q_GADGET",
+		"Q_GADGET_EXPORT",
+		"Q_NAMESPACE",
+		"Q_NAMESPACE_EXPORT"
+	],
+	"MOC_OPTIONS" : [],
+	"MOC_PATH_PREFIX" : false,
+	"MOC_PREDEFS_CMD" : 
+	[
+		"/usr/bin/c++",
+		"-std=c++23",
+		"-dM",
+		"-E",
+		"-c",
+		"/usr/share/cmake-3.28/Modules/CMakeCXXCompilerABI.cpp"
+	],
+	"MOC_PREDEFS_FILE" : "/home/iwan/Project/hik-device-discovery/hiksadp/build/src/hiksadp_protocol_autogen/moc_predefs.h",
+	"MOC_RELAXED_MODE" : false,
+	"MOC_SKIP" : 
+	[
+		"/home/iwan/Project/hik-device-discovery/hiksadp/build/src/hiksadp_core_autogen/mocs_compilation.cpp"
+	],
+	"MULTI_CONFIG" : false,
+	"PARALLEL" : 6,
+	"PARSE_CACHE_FILE" : "/home/iwan/Project/hik-device-discovery/hiksadp/build/src/CMakeFiles/hiksadp_protocol_autogen.dir/ParseCache.txt",
+	"QT_MOC_EXECUTABLE" : "/usr/lib/qt6/libexec/moc",
+	"QT_UIC_EXECUTABLE" : "/usr/lib/qt6/libexec/uic",
+	"QT_VERSION_MAJOR" : 6,
+	"QT_VERSION_MINOR" : 4,
+	"SETTINGS_FILE" : "/home/iwan/Project/hik-device-discovery/hiksadp/build/src/CMakeFiles/hiksadp_protocol_autogen.dir/AutogenUsed.txt",
+	"SOURCES" : 
+	[
+		[
+			"/home/iwan/Project/hik-device-discovery/hiksadp/src/protocol/sadp_discovery.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/iwan/Project/hik-device-discovery/hiksadp/src/protocol/sadp_packet.cpp",
+			"MU",
+			null
+		]
+	],
+	"UIC_OPTIONS" : [],
+	"UIC_SEARCH_PATHS" : [],
+	"UIC_SKIP" : 
+	[
+		"/home/iwan/Project/hik-device-discovery/hiksadp/build/src/hiksadp_core_autogen/mocs_compilation.cpp"
+	],
+	"UIC_UI_FILES" : [],
+	"VERBOSITY" : 0
+}

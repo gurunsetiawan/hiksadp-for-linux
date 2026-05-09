@@ -1,0 +1,4 @@
+hiksadp_cli_autogen/timestamp: \
+	/home/iwan/Project/hik-device-discovery/hiksadp/src/CMakeLists.txt \
+	/home/iwan/Project/hik-device-discovery/hiksadp/src/main_cli.cpp \
+	/usr/bin/cmake
