@@ -40,6 +40,7 @@ add_library(hiksadp_ui STATIC
   ui/device_table.hpp
   ui/device_table.cpp
   ui/main_window.hpp
+  ui/main_window.cpp
 )
 
 target_include_directories(hiksadp_ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -55,4 +56,12 @@ add_executable(hiksadp_cli
 
 target_link_libraries(hiksadp_cli
   PRIVATE hiksadp_protocol Qt6::Core Qt6::Network
+)
+
+add_executable(hiksadp_gui
+  main_gui.cpp
+)
+
+target_link_libraries(hiksadp_gui
+  PRIVATE hiksadp_ui hiksadp_management hiksadp_protocol Qt6::Widgets Qt6::Core Qt6::Network
 )
