@@ -9,6 +9,7 @@
 #include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QComboBox>
@@ -19,6 +20,7 @@
 #include <QStatusBar>
 #include <QTextStream>
 #include <QToolBar>
+#include <QDateTime>
 
 namespace hiksadp::ui {
 
@@ -33,6 +35,7 @@ struct MainWindow::Impl {
     QPushButton* btn_export_xml{nullptr};
     QLineEdit* search_edit{nullptr};
     QComboBox* status_filter{nullptr};
+    QCheckBox* auto_refresh_check{nullptr};
 
     QLabel* lbl_status{nullptr};
     QProgressBar* progress{nullptr};
@@ -40,6 +43,89 @@ struct MainWindow::Impl {
     DeviceManager device_manager;
     protocol::SadpDiscovery scanner;
 };
+
+static std::vector<std::pair<QString, QString>> export_columns()
+{
+    return {
+        {"IP Address", "ip"},
+        {"Subnet Mask", "subnet"},
+        {"Gateway", "gateway"},
+        {"HTTP Port", "http"},
+        {"SDK Port", "sdk"},
+        {"MAC Address", "mac"},
+        {"Serial Number", "serial"},
+        {"Model", "model"},
+        {"Device Type", "type"},
+        {"Firmware", "firmware"},
+        {"DHCP", "dhcp"},
+        {"Status", "status"},
+    };
+}
+
+static QString escape_xml(QString s)
+{
+    s.replace("&", "&amp;");
+    s.replace("<", "&lt;");
+    s.replace(">", "&gt;");
+    s.replace("\"", "&quot;");
+    s.replace("'", "&apos;");
+    return s;
+}
+
+static std::optional<std::vector<QString>>
+prompt_export_columns(QWidget* parent, const QString& title)
+{
+    QDialog dialog(parent);
+    dialog.setWindowTitle(title);
+    dialog.setModal(true);
+
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* info = new QLabel("Pilih kolom yang akan diexport:", &dialog);
+    layout->addWidget(info);
+
+    auto* list = new QListWidget(&dialog);
+    for (const auto& [label, key] : export_columns()) {
+        auto* item = new QListWidgetItem(label, list);
+        item->setData(Qt::UserRole, key);
+        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+        item->setCheckState(Qt::Checked);
+    }
+    layout->addWidget(list);
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    layout->addWidget(buttons);
+    QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+    if (dialog.exec() != QDialog::Accepted) return std::nullopt;
+
+    std::vector<QString> cols;
+    for (int i = 0; i < list->count(); ++i) {
+        const auto* item = list->item(i);
+        if (item->checkState() == Qt::Checked) {
+            cols.push_back(item->data(Qt::UserRole).toString());
+        }
+    }
+    if (cols.empty()) return std::nullopt;
+    return cols;
+}
+
+static QString device_field_value(const Device& dev, const QString& key)
+{
+    if (key == "ip") return QString::fromStdString(dev.network.ip.get());
+    if (key == "subnet") return QString::fromStdString(dev.network.subnet_mask.get());
+    if (key == "gateway") return QString::fromStdString(dev.network.gateway.get());
+    if (key == "http") return QString::number(dev.network.http_port.get());
+    if (key == "sdk") return QString::number(dev.network.sdk_port.get());
+    if (key == "mac") return QString::fromStdString(dev.mac_address.get());
+    if (key == "serial") return QString::fromStdString(dev.serial_number.get());
+    if (key == "model") return QString::fromStdString(dev.model);
+    if (key == "type") return QString::fromStdString(dev.device_type);
+    if (key == "firmware") return QString::fromStdString(dev.firmware_version.get());
+    if (key == "dhcp") return dev.network.dhcp_enabled ? "Yes" : "No";
+    if (key == "status") return QString::fromStdString(dev.status_string());
+    return {};
+}
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), impl_{std::make_unique<Impl>()}
@@ -81,6 +167,7 @@ void MainWindow::setup_toolbar()
     impl_->btn_export_xml = new QPushButton("Export XML", this);
     impl_->search_edit = new QLineEdit(this);
     impl_->status_filter = new QComboBox(this);
+    impl_->auto_refresh_check = new QCheckBox("Auto refresh (15s)", this);
     impl_->search_edit->setPlaceholderText("Search IP / Serial / Model...");
     impl_->search_edit->setMinimumWidth(240);
     impl_->status_filter->addItems({"All", "Active", "Inactive"});
@@ -92,6 +179,7 @@ void MainWindow::setup_toolbar()
     toolbar->addSeparator();
     toolbar->addWidget(impl_->search_edit);
     toolbar->addWidget(impl_->status_filter);
+    toolbar->addWidget(impl_->auto_refresh_check);
     toolbar->addSeparator();
     toolbar->addWidget(impl_->btn_export_csv);
     toolbar->addWidget(impl_->btn_export_xml);
@@ -131,6 +219,10 @@ void MainWindow::setup_connections()
             impl_->table, &DeviceTableWidget::set_filter_text);
     connect(impl_->status_filter, &QComboBox::currentTextChanged,
             impl_->table, &DeviceTableWidget::set_filter_status);
+    connect(impl_->auto_refresh_check, &QCheckBox::toggled, this, [this](bool enabled) {
+        impl_->scanner.set_auto_refresh(enabled);
+        impl_->lbl_status->setText(enabled ? "Auto refresh enabled (15s)" : "Auto refresh disabled");
+    });
 
     impl_->device_manager.on_device_list_changed([this](const std::vector<Device>& devices) {
         impl_->table->set_devices(devices);
@@ -179,9 +271,15 @@ std::vector<hiksadp::MacAddress> MainWindow::selected_macs() const
 
 void MainWindow::on_scan_clicked()
 {
+    if (impl_->scanner.is_scanning()) {
+        show_info("Scan", "Scan sedang berjalan.");
+        return;
+    }
+    impl_->btn_scan->setEnabled(false);
     impl_->lbl_status->setText("Scanning...");
     auto result = impl_->scanner.start_scan();
     if (!result) {
+        impl_->btn_scan->setEnabled(true);
         show_error("Scan Error", QString::fromStdString(result.error().message()));
     }
 }
@@ -521,11 +619,8 @@ void MainWindow::on_reboot_clicked()
 
 void MainWindow::on_export_csv_clicked()
 {
-    auto result = impl_->device_manager.export_csv();
-    if (!result) {
-        show_error("Export CSV Error", QString::fromStdString(result.error().message()));
-        return;
-    }
+    const auto selected = prompt_export_columns(this, "Export CSV Columns");
+    if (!selected.has_value()) return;
 
     const auto path = QFileDialog::getSaveFileName(this, "Export CSV", "devices.csv", "CSV Files (*.csv)");
     if (path.isEmpty()) return;
@@ -536,18 +631,35 @@ void MainWindow::on_export_csv_clicked()
         return;
     }
 
+    const auto cols = selected.value();
+    QStringList headers;
+    for (const auto& key : cols) {
+        for (const auto& [label, map_key] : export_columns()) {
+            if (map_key == key) {
+                headers << label;
+                break;
+            }
+        }
+    }
+
     QTextStream out(&file);
-    out << QString::fromStdString(result.value());
+    out << headers.join(',') << "\n";
+    const auto devices = impl_->device_manager.devices();
+    for (const auto& dev : devices) {
+        QStringList row;
+        for (const auto& key : cols) {
+            row << device_field_value(dev, key);
+        }
+        out << row.join(',') << "\n";
+    }
+
     impl_->lbl_status->setText("CSV exported");
 }
 
 void MainWindow::on_export_xml_clicked()
 {
-    auto result = impl_->device_manager.export_xml();
-    if (!result) {
-        show_error("Export XML Error", QString::fromStdString(result.error().message()));
-        return;
-    }
+    const auto selected = prompt_export_columns(this, "Export XML Columns");
+    if (!selected.has_value()) return;
 
     const auto path = QFileDialog::getSaveFileName(this, "Export XML", "devices.xml", "XML Files (*.xml)");
     if (path.isEmpty()) return;
@@ -558,8 +670,31 @@ void MainWindow::on_export_xml_clicked()
         return;
     }
 
+    const auto cols = selected.value();
     QTextStream out(&file);
-    out << QString::fromStdString(result.value());
+    out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    out << "<DeviceList generatedAt=\""
+        << QDateTime::currentDateTime().toString(Qt::ISODate)
+        << "\">\n";
+    const auto devices = impl_->device_manager.devices();
+    for (const auto& dev : devices) {
+        out << "  <Device>\n";
+        for (const auto& key : cols) {
+            QString tag;
+            for (const auto& [label, map_key] : export_columns()) {
+                if (map_key == key) {
+                    tag = label;
+                    break;
+                }
+            }
+            tag.remove(' ');
+            out << "    <" << tag << ">"
+                << escape_xml(device_field_value(dev, key))
+                << "</" << tag << ">\n";
+        }
+        out << "  </Device>\n";
+    }
+    out << "</DeviceList>\n";
     impl_->lbl_status->setText("XML exported");
 }
 
@@ -578,6 +713,7 @@ void MainWindow::on_device_found(const hiksadp::Device& device)
 
 void MainWindow::on_scan_complete(const protocol::DiscoveryResult& result)
 {
+    impl_->btn_scan->setEnabled(true);
     impl_->lbl_status->setText(QString("Scan complete: %1 device(s)").arg(result.responses_received));
 }
 
