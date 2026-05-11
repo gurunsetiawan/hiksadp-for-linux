@@ -5,10 +5,15 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QFileDialog>
+#include <QFormLayout>
 #include <QInputDialog>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QCheckBox>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QStatusBar>
 #include <QTextStream>
 #include <QToolBar>
@@ -206,7 +211,108 @@ void MainWindow::on_activate_clicked()
 
 void MainWindow::on_network_config_clicked()
 {
-    show_info("Not Implemented", "Network config dialog akan diimplementasikan di M2.");
+    const auto macs = selected_macs();
+    if (macs.empty()) {
+        show_info("Network Config", "Pilih satu device terlebih dulu.");
+        return;
+    }
+    if (macs.size() != 1) {
+        show_info("Network Config", "Untuk saat ini, Network Config hanya mendukung 1 device.");
+        return;
+    }
+
+    auto dev = impl_->device_manager.find_by_mac(macs.front());
+    if (!dev) {
+        show_error("Network Config Error", "Device tidak ditemukan.");
+        return;
+    }
+
+    QDialog dialog(this);
+    dialog.setWindowTitle("Network Configuration");
+    dialog.setModal(true);
+
+    auto* form = new QFormLayout(&dialog);
+
+    auto* ip_edit = new QLineEdit(QString::fromStdString(dev->network.ip.get()), &dialog);
+    auto* mask_edit = new QLineEdit(QString::fromStdString(dev->network.subnet_mask.get()), &dialog);
+    auto* gateway_edit = new QLineEdit(QString::fromStdString(dev->network.gateway.get()), &dialog);
+    auto* http_port_edit = new QLineEdit(QString::number(dev->network.http_port.get()), &dialog);
+    auto* sdk_port_edit = new QLineEdit(QString::number(dev->network.sdk_port.get()), &dialog);
+    auto* dhcp_check = new QCheckBox("Enable DHCP", &dialog);
+    dhcp_check->setChecked(dev->network.dhcp_enabled);
+
+    auto* password_edit = new QLineEdit(&dialog);
+    password_edit->setEchoMode(QLineEdit::Password);
+
+    form->addRow("IP Address", ip_edit);
+    form->addRow("Subnet Mask", mask_edit);
+    form->addRow("Gateway", gateway_edit);
+    form->addRow("HTTP Port", http_port_edit);
+    form->addRow("SDK Port", sdk_port_edit);
+    form->addRow(dhcp_check);
+    form->addRow("Admin Password", password_edit);
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    form->addRow(buttons);
+
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    const auto ip = ip_edit->text().trimmed().toStdString();
+    const auto mask = mask_edit->text().trimmed().toStdString();
+    const auto gateway = gateway_edit->text().trimmed().toStdString();
+    const auto password = password_edit->text().toStdString();
+    const auto dhcp_enabled = dhcp_check->isChecked();
+
+    bool http_ok = false;
+    const auto http_port_num = http_port_edit->text().trimmed().toUShort(&http_ok);
+    bool sdk_ok = false;
+    const auto sdk_port_num = sdk_port_edit->text().trimmed().toUShort(&sdk_ok);
+
+    if (!http_ok || !sdk_ok || http_port_num == 0 || sdk_port_num == 0) {
+        show_error("Network Config Error", "HTTP/SDK port tidak valid.");
+        return;
+    }
+    if (password.empty()) {
+        show_error("Network Config Error", "Password admin wajib diisi.");
+        return;
+    }
+    if (!is_valid_ip(ip) || !is_valid_ip(mask) || !is_valid_ip(gateway)) {
+        show_error("Network Config Error", "Format IP/Subnet/Gateway tidak valid.");
+        return;
+    }
+
+    const auto confirm = QMessageBox::question(
+        this,
+        "Confirm Network Change",
+        "Perubahan network dapat memutus koneksi sementara.\nLanjutkan?",
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No);
+    if (confirm != QMessageBox::Yes) {
+        return;
+    }
+
+    const auto result = impl_->device_manager.set_network_config(
+        macs.front(),
+        Password{password},
+        IpAddress{ip},
+        IpAddress{mask},
+        IpAddress{gateway},
+        Port{static_cast<std::uint16_t>(http_port_num)},
+        Port{static_cast<std::uint16_t>(sdk_port_num)},
+        dhcp_enabled);
+
+    if (!result) {
+        show_error("Network Config Error", QString::fromStdString(result.error().message()));
+        return;
+    }
+
+    show_info("Network Config", "Konfigurasi network berhasil diterapkan.");
+    impl_->lbl_status->setText("Network configuration applied");
 }
 
 void MainWindow::on_reboot_clicked()
