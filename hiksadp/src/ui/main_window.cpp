@@ -1,5 +1,6 @@
 #include "ui/main_window.hpp"
 
+#include "core/logger.hpp"
 #include "management/password_reset_service.hpp"
 #include "ui/device_table.hpp"
 
@@ -29,6 +30,7 @@
 #include <QVBoxLayout>
 #include <QWidget>
 #include <chrono>
+#include <format>
 
 namespace hiksadp::ui {
 
@@ -434,6 +436,7 @@ std::vector<hiksadp::MacAddress> MainWindow::selected_macs() const
 
 void MainWindow::on_scan_clicked()
 {
+    Logger::write(LogLevel::Info, "ui.scan_clicked");
     if (impl_->scanner.is_scanning()) {
         show_info("Scan", "Scan sedang berjalan.");
         return;
@@ -449,6 +452,7 @@ void MainWindow::on_scan_clicked()
 
 void MainWindow::on_scan_settings_clicked()
 {
+    Logger::write(LogLevel::Info, "ui.scan_settings_clicked");
     auto [stale_after, purge_after] = impl_->device_manager.retention_policy();
 
     QDialog dialog(this);
@@ -495,6 +499,7 @@ void MainWindow::on_scan_settings_clicked()
 
 void MainWindow::on_activate_clicked()
 {
+    Logger::write(LogLevel::Info, "ui.activate_clicked");
     const auto macs = selected_macs();
     if (macs.empty()) {
         show_info("Activate", "Pilih minimal satu device terlebih dulu.");
@@ -553,6 +558,7 @@ void MainWindow::on_activate_clicked()
 
 void MainWindow::on_network_config_clicked()
 {
+    Logger::write(LogLevel::Info, "ui.network_config_clicked");
     const auto macs = selected_macs();
     if (macs.empty()) {
         show_info("Network Config", "Pilih satu device terlebih dulu.");
@@ -767,6 +773,7 @@ void MainWindow::on_network_config_clicked()
 
 void MainWindow::on_reboot_clicked()
 {
+    Logger::write(LogLevel::Info, "ui.reboot_clicked");
     const auto macs = selected_macs();
     if (macs.empty()) {
         show_info("Reboot", "Pilih minimal satu device terlebih dulu.");
@@ -828,6 +835,7 @@ void MainWindow::on_reboot_clicked()
 
 void MainWindow::on_change_password_clicked()
 {
+    Logger::write(LogLevel::Info, "ui.change_password_clicked");
     const auto macs = selected_macs();
     if (macs.size() != 1) {
         show_info("Change Password", "Pilih tepat satu device.");
@@ -888,6 +896,7 @@ void MainWindow::on_change_password_clicked()
 
 void MainWindow::on_open_web_clicked()
 {
+    Logger::write(LogLevel::Info, "ui.open_web_clicked");
     const auto macs = selected_macs();
     if (macs.size() != 1) {
         show_info("Open Web", "Pilih tepat satu device.");
@@ -942,6 +951,7 @@ void MainWindow::on_device_detail_clicked()
 
 void MainWindow::on_password_reset_clicked()
 {
+    Logger::write(LogLevel::Info, "ui.password_reset_clicked");
     const auto macs = selected_macs();
     if (macs.size() != 1) {
         show_info("Password Reset", "Pilih tepat satu device untuk password reset.");
@@ -1109,6 +1119,7 @@ void MainWindow::on_password_reset_clicked()
 
 void MainWindow::on_export_csv_clicked()
 {
+    Logger::write(LogLevel::Info, "ui.export_csv_clicked");
     const auto selected = prompt_export_columns(this, "Export CSV Columns");
     if (!selected.has_value()) return;
 
@@ -1148,6 +1159,7 @@ void MainWindow::on_export_csv_clicked()
 
 void MainWindow::on_export_xml_clicked()
 {
+    Logger::write(LogLevel::Info, "ui.export_xml_clicked");
     const auto selected = prompt_export_columns(this, "Export XML Columns");
     if (!selected.has_value()) return;
 
@@ -1223,15 +1235,23 @@ void MainWindow::on_scan_complete(const protocol::DiscoveryResult& result)
 {
     impl_->btn_scan->setEnabled(true);
     impl_->lbl_status->setText(QString("Scan complete: %1 device(s)").arg(result.responses_received));
+    Logger::write(
+        LogLevel::Info,
+        std::format("scan_complete devices={} datagrams_in={} parse_failed={}",
+                    result.responses_received,
+                    result.datagrams_received,
+                    result.datagrams_parse_failed));
 }
 
 void MainWindow::show_error(const QString& title, const QString& message)
 {
+    Logger::write(LogLevel::Error, std::format("{}: {}", title.toStdString(), message.toStdString()));
     QMessageBox::critical(this, title, message);
 }
 
 void MainWindow::show_info(const QString& title, const QString& message)
 {
+    Logger::write(LogLevel::Info, std::format("{}: {}", title.toStdString(), message.toStdString()));
     QMessageBox::information(this, title, message);
 }
 

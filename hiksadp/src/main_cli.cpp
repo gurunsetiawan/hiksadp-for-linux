@@ -1,5 +1,6 @@
 #include "protocol/sadp_discovery.hpp"
 #include "core/device.hpp"
+#include "core/logger.hpp"
 
 #include <QCoreApplication>
 #include <QTimer>
@@ -201,9 +202,12 @@ int main(int argc, char* argv[])
     QCoreApplication app(argc, argv);
     app.setApplicationName("HikSADP Linux");
     app.setApplicationVersion("1.0.0");
+    Logger::set_log_file("logs/hiksadp.log");
+    Logger::write(LogLevel::Info, "CLI started");
 
     auto parsed = parse_args(argc, argv);
     if (!parsed) {
+        Logger::write(LogLevel::Error, std::string{"CLI arg error: "} + parsed.error().message());
         std::cerr << "Argumen error: " << parsed.error().message() << "\n\n";
         print_usage(argv[0]);
         return 2;
@@ -212,6 +216,7 @@ int main(int argc, char* argv[])
 
     print_header();
     if (opts.help) {
+        Logger::write(LogLevel::Info, "CLI help requested");
         print_usage(argv[0]);
         return 0;
     }

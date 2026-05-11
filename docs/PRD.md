@@ -56,6 +56,7 @@ Teknisi Linux membutuhkan tool native untuk discovery dan konfigurasi perangkat 
 - Preserve selection saat auto refresh (berdasarkan MAC).
 - Export CSV/XML.
 - Open web login device.
+- Logging operasional ke file `logs/hiksadp.log` untuk aksi penting dan error.
 
 ## 6. Non-Functional Requirements
 - Build di Linux dengan CMake + Qt6 + C++23.
@@ -86,3 +87,6 @@ Teknisi Linux membutuhkan tool native untuk discovery dan konfigurasi perangkat 
 ## 10. Open Items
 - Security Questions full flow per firmware matrix.
 - Advanced mode: optional single-interface scan selector (non-default).
+- Theme policy eksplisit + opsi override dark/light.
+- Packaging release (AppImage/.deb/.rpm) dan pipeline CI build.
+- Peningkatan test depth sesuai matriks test decisions PRD v1.0.
