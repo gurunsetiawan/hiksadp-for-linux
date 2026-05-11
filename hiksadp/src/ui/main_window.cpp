@@ -24,11 +24,16 @@
 #include <QDateTime>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QSplitter>
+#include <QTextEdit>
+#include <QVBoxLayout>
+#include <QWidget>
 
 namespace hiksadp::ui {
 
 struct MainWindow::Impl {
     DeviceTableWidget* table{nullptr};
+    QTextEdit* detail_text{nullptr};
 
     QPushButton* btn_scan{nullptr};
     QPushButton* btn_activate{nullptr};
@@ -51,6 +56,33 @@ struct MainWindow::Impl {
     PasswordResetService password_reset_service;
     protocol::SadpDiscovery scanner;
 };
+
+static QString format_device_detail_text(const Device& dev)
+{
+    QString detail;
+    detail += "Network\n";
+    detail += "-------\n";
+    detail += "IP: " + QString::fromStdString(dev.network.ip.get()) + "\n";
+    detail += "Subnet: " + QString::fromStdString(dev.network.subnet_mask.get()) + "\n";
+    detail += "Gateway: " + QString::fromStdString(dev.network.gateway.get()) + "\n";
+    detail += "HTTP Port: " + QString::number(dev.network.http_port.get()) + "\n";
+    detail += "SDK Port: " + QString::number(dev.network.sdk_port.get()) + "\n\n";
+    detail += "Identity\n";
+    detail += "--------\n";
+    detail += "MAC: " + QString::fromStdString(dev.mac_address.get()) + "\n";
+    detail += "Serial: " + QString::fromStdString(dev.serial_number.get()) + "\n";
+    detail += "Model: " + QString::fromStdString(dev.model) + "\n";
+    detail += "Device Type: " + QString::fromStdString(dev.device_type) + "\n";
+    detail += "Firmware: " + QString::fromStdString(dev.firmware_version.get()) + "\n";
+    detail += "Status: " + QString::fromStdString(dev.status_string()) + "\n\n";
+    detail += "Recovery Capability\n";
+    detail += "-------------------\n";
+    detail += "Reset Mode: " +
+              (dev.password_reset_mode.empty() ? "-" : QString::fromStdString(dev.password_reset_mode)) + "\n";
+    detail += "Reset Support: " +
+              (dev.support_reset.empty() ? "-" : QString::fromStdString(dev.support_reset)) + "\n";
+    return detail;
+}
 
 static std::vector<std::pair<QString, QString>> export_columns()
 {
@@ -163,8 +195,24 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
 void MainWindow::setup_ui()
 {
-    impl_->table = new DeviceTableWidget(this);
-    setCentralWidget(impl_->table);
+    auto* splitter = new QSplitter(Qt::Horizontal, this);
+    impl_->table = new DeviceTableWidget(splitter);
+
+    auto* detail_container = new QWidget(splitter);
+    auto* detail_layout = new QVBoxLayout(detail_container);
+    detail_layout->setContentsMargins(6, 6, 6, 6);
+    auto* detail_title = new QLabel("Device Detail", detail_container);
+    impl_->detail_text = new QTextEdit(detail_container);
+    impl_->detail_text->setReadOnly(true);
+    impl_->detail_text->setPlainText("Pilih satu device untuk melihat detail.");
+    detail_layout->addWidget(detail_title);
+    detail_layout->addWidget(impl_->detail_text);
+
+    splitter->addWidget(impl_->table);
+    splitter->addWidget(detail_container);
+    splitter->setStretchFactor(0, 4);
+    splitter->setStretchFactor(1, 2);
+    setCentralWidget(splitter);
 }
 
 void MainWindow::setup_toolbar()
@@ -255,6 +303,7 @@ void MainWindow::setup_connections()
     impl_->device_manager.on_device_list_changed([this](const std::vector<Device>& devices) {
         impl_->table->set_devices(devices);
         impl_->lbl_status->setText(QString("Devices: %1").arg(devices.size()));
+        on_selection_changed();
         update_action_states();
     });
 
@@ -746,24 +795,7 @@ void MainWindow::on_device_detail_clicked()
         return;
     }
 
-    QString detail;
-    detail += "IP: " + QString::fromStdString(dev->network.ip.get()) + "\n";
-    detail += "Subnet: " + QString::fromStdString(dev->network.subnet_mask.get()) + "\n";
-    detail += "Gateway: " + QString::fromStdString(dev->network.gateway.get()) + "\n";
-    detail += "HTTP Port: " + QString::number(dev->network.http_port.get()) + "\n";
-    detail += "SDK Port: " + QString::number(dev->network.sdk_port.get()) + "\n\n";
-    detail += "MAC: " + QString::fromStdString(dev->mac_address.get()) + "\n";
-    detail += "Serial: " + QString::fromStdString(dev->serial_number.get()) + "\n";
-    detail += "Model: " + QString::fromStdString(dev->model) + "\n";
-    detail += "Device Type: " + QString::fromStdString(dev->device_type) + "\n";
-    detail += "Firmware: " + QString::fromStdString(dev->firmware_version.get()) + "\n";
-    detail += "Status: " + QString::fromStdString(dev->status_string()) + "\n\n";
-    detail += "Reset Mode: " +
-              (dev->password_reset_mode.empty() ? "-" : QString::fromStdString(dev->password_reset_mode)) + "\n";
-    detail += "Reset Support: " +
-              (dev->support_reset.empty() ? "-" : QString::fromStdString(dev->support_reset)) + "\n";
-
-    show_info("Device Detail", detail);
+    show_info("Device Detail", format_device_detail_text(*dev));
     impl_->lbl_status->setText("Device detail viewed");
 }
 
@@ -1018,6 +1050,24 @@ void MainWindow::on_export_xml_clicked()
 void MainWindow::on_selection_changed()
 {
     update_action_states();
+    const auto macs = selected_macs();
+    if (macs.size() != 1) {
+        if (impl_->detail_text) {
+            impl_->detail_text->setPlainText("Pilih satu device untuk melihat detail.");
+        }
+        return;
+    }
+
+    auto dev = impl_->device_manager.find_by_mac(macs.front());
+    if (!dev) {
+        if (impl_->detail_text) {
+            impl_->detail_text->setPlainText("Device terpilih tidak ditemukan.");
+        }
+        return;
+    }
+    if (impl_->detail_text) {
+        impl_->detail_text->setPlainText(format_device_detail_text(*dev));
+    }
 }
 
 void MainWindow::on_device_found(const hiksadp::Device& device)
