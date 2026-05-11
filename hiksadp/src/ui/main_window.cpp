@@ -15,6 +15,7 @@
 #include <QCheckBox>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QProgressBar>
 #include <QStatusBar>
 #include <QTextStream>
 #include <QToolBar>
@@ -34,6 +35,7 @@ struct MainWindow::Impl {
     QComboBox* status_filter{nullptr};
 
     QLabel* lbl_status{nullptr};
+    QProgressBar* progress{nullptr};
 
     DeviceManager device_manager;
     protocol::SadpDiscovery scanner;
@@ -98,7 +100,14 @@ void MainWindow::setup_toolbar()
 void MainWindow::setup_statusbar()
 {
     impl_->lbl_status = new QLabel("Ready", this);
+    impl_->progress = new QProgressBar(this);
+    impl_->progress->setMinimum(0);
+    impl_->progress->setMaximum(100);
+    impl_->progress->setValue(0);
+    impl_->progress->setVisible(false);
+    impl_->progress->setFixedWidth(260);
     statusBar()->addPermanentWidget(impl_->lbl_status);
+    statusBar()->addPermanentWidget(impl_->progress);
 }
 
 void MainWindow::setup_connections()
@@ -139,6 +148,17 @@ void MainWindow::setup_connections()
 
     impl_->scanner.on_error([this](const AppError& err) {
         show_error("Scan Error", QString::fromStdString(err.message()));
+    });
+
+    impl_->device_manager.on_progress([this](int current, int total, const std::string& label) {
+        if (total <= 0) return;
+        impl_->progress->setVisible(true);
+        impl_->progress->setMaximum(total);
+        impl_->progress->setValue(current);
+        impl_->lbl_status->setText(QString::fromStdString(label));
+        if (current >= total) {
+            impl_->progress->setVisible(false);
+        }
     });
 }
 
@@ -231,8 +251,116 @@ void MainWindow::on_network_config_clicked()
         show_info("Network Config", "Pilih satu device terlebih dulu.");
         return;
     }
-    if (macs.size() != 1) {
-        show_info("Network Config", "Untuk saat ini, Network Config hanya mendukung 1 device.");
+    if (macs.size() > 1) {
+        QDialog dialog(this);
+        dialog.setWindowTitle("Batch Sequential IP Configuration");
+        dialog.setModal(true);
+
+        auto* form = new QFormLayout(&dialog);
+        auto* start_ip_edit = new QLineEdit("192.168.1.64", &dialog);
+        auto* mask_edit = new QLineEdit("255.255.255.0", &dialog);
+        auto* gateway_edit = new QLineEdit("192.168.1.1", &dialog);
+        auto* http_port_edit = new QLineEdit("80", &dialog);
+        auto* sdk_port_edit = new QLineEdit("8000", &dialog);
+        auto* dhcp_check = new QCheckBox("Enable DHCP", &dialog);
+        auto* password_edit = new QLineEdit(&dialog);
+        password_edit->setEchoMode(QLineEdit::Password);
+
+        form->addRow("Start IP", start_ip_edit);
+        form->addRow("Subnet Mask", mask_edit);
+        form->addRow("Gateway", gateway_edit);
+        form->addRow("HTTP Port", http_port_edit);
+        form->addRow("SDK Port", sdk_port_edit);
+        form->addRow(dhcp_check);
+        form->addRow("Admin Password", password_edit);
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+        form->addRow(buttons);
+        connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+        if (dialog.exec() != QDialog::Accepted) {
+            return;
+        }
+
+        const auto start_ip = start_ip_edit->text().trimmed().toStdString();
+        const auto mask = mask_edit->text().trimmed().toStdString();
+        const auto gateway = gateway_edit->text().trimmed().toStdString();
+        const auto password = password_edit->text().toStdString();
+        const auto dhcp_enabled = dhcp_check->isChecked();
+
+        bool http_ok = false;
+        const auto http_port_num = http_port_edit->text().trimmed().toUShort(&http_ok);
+        bool sdk_ok = false;
+        const auto sdk_port_num = sdk_port_edit->text().trimmed().toUShort(&sdk_ok);
+
+        if (!http_ok || !sdk_ok || http_port_num == 0 || sdk_port_num == 0) {
+            show_error("Batch Network Config Error", "HTTP/SDK port tidak valid.");
+            return;
+        }
+        if (password.empty()) {
+            show_error("Batch Network Config Error", "Password admin wajib diisi.");
+            return;
+        }
+        if (!is_valid_ip(start_ip) || !is_valid_ip(mask) || !is_valid_ip(gateway)) {
+            show_error("Batch Network Config Error", "Format Start IP/Subnet/Gateway tidak valid.");
+            return;
+        }
+
+        IpSequenceConfig cfg{
+            IpAddress{start_ip},
+            IpAddress{mask},
+            IpAddress{gateway},
+            Port{static_cast<std::uint16_t>(http_port_num)},
+            Port{static_cast<std::uint16_t>(sdk_port_num)},
+            dhcp_enabled
+        };
+
+        const auto preview = impl_->device_manager.preview_sequential_ips(macs, cfg);
+        QStringList lines;
+        for (const auto& [mac, ip] : preview) {
+            lines << QString("%1 -> %2")
+                         .arg(QString::fromStdString(mac.get()))
+                         .arg(QString::fromStdString(ip.get()));
+        }
+
+        const auto confirm = QMessageBox::question(
+            this,
+            "Confirm Batch IP Assignment",
+            "IP preview:\n" + lines.join('\n') + "\n\nLanjutkan apply?",
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::No);
+        if (confirm != QMessageBox::Yes) {
+            return;
+        }
+
+        const auto result = impl_->device_manager.assign_sequential_ips(
+            macs, Password{password}, cfg);
+
+        const auto success = result.success_count();
+        const auto failed = result.failure_count();
+
+        QString message = QString("Batch IP selesai.\nBerhasil: %1\nGagal: %2")
+            .arg(success)
+            .arg(failed);
+
+        if (failed > 0) {
+            QStringList failed_lines;
+            for (const auto& item : result.items) {
+                if (!item.success) {
+                    failed_lines << QString("- %1: %2")
+                                       .arg(QString::fromStdString(item.device_label))
+                                       .arg(QString::fromStdString(item.error_message));
+                }
+            }
+            message += "\n\nDetail gagal:\n" + failed_lines.join('\n');
+            show_error("Batch Network Config Result", message);
+        } else {
+            show_info("Batch Network Config Result", message);
+        }
+
+        impl_->lbl_status->setText(
+            QString("Batch IP done: %1 success, %2 failed").arg(success).arg(failed));
         return;
     }
 
