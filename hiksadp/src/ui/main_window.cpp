@@ -34,6 +34,8 @@ namespace hiksadp::ui {
 struct MainWindow::Impl {
     DeviceTableWidget* table{nullptr};
     QTextEdit* detail_text{nullptr};
+    QSplitter* splitter{nullptr};
+    QWidget* detail_container{nullptr};
 
     QPushButton* btn_scan{nullptr};
     QPushButton* btn_activate{nullptr};
@@ -41,6 +43,7 @@ struct MainWindow::Impl {
     QPushButton* btn_reboot{nullptr};
     QPushButton* btn_change_password{nullptr};
     QPushButton* btn_open_web{nullptr};
+    QPushButton* btn_toggle_detail{nullptr};
     QPushButton* btn_device_detail{nullptr};
     QPushButton* btn_password_reset{nullptr};
     QPushButton* btn_export_csv{nullptr};
@@ -264,24 +267,24 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
 void MainWindow::setup_ui()
 {
-    auto* splitter = new QSplitter(Qt::Horizontal, this);
-    impl_->table = new DeviceTableWidget(splitter);
+    impl_->splitter = new QSplitter(Qt::Horizontal, this);
+    impl_->table = new DeviceTableWidget(impl_->splitter);
 
-    auto* detail_container = new QWidget(splitter);
-    auto* detail_layout = new QVBoxLayout(detail_container);
+    impl_->detail_container = new QWidget(impl_->splitter);
+    auto* detail_layout = new QVBoxLayout(impl_->detail_container);
     detail_layout->setContentsMargins(6, 6, 6, 6);
-    auto* detail_title = new QLabel("Device Detail", detail_container);
-    impl_->detail_text = new QTextEdit(detail_container);
+    auto* detail_title = new QLabel("Device Detail", impl_->detail_container);
+    impl_->detail_text = new QTextEdit(impl_->detail_container);
     impl_->detail_text->setReadOnly(true);
-        impl_->detail_text->setHtml("Pilih satu device untuk melihat detail.");
+    impl_->detail_text->setHtml("Pilih satu device untuk melihat detail.");
     detail_layout->addWidget(detail_title);
     detail_layout->addWidget(impl_->detail_text);
 
-    splitter->addWidget(impl_->table);
-    splitter->addWidget(detail_container);
-    splitter->setStretchFactor(0, 4);
-    splitter->setStretchFactor(1, 2);
-    setCentralWidget(splitter);
+    impl_->splitter->addWidget(impl_->table);
+    impl_->splitter->addWidget(impl_->detail_container);
+    impl_->splitter->setStretchFactor(0, 4);
+    impl_->splitter->setStretchFactor(1, 2);
+    setCentralWidget(impl_->splitter);
 }
 
 void MainWindow::setup_toolbar()
@@ -294,6 +297,7 @@ void MainWindow::setup_toolbar()
     impl_->btn_reboot = new QPushButton("Reboot", this);
     impl_->btn_change_password = new QPushButton("Change Password", this);
     impl_->btn_open_web = new QPushButton("Open Web", this);
+    impl_->btn_toggle_detail = new QPushButton("Hide Detail", this);
     impl_->btn_device_detail = new QPushButton("Device Detail", this);
     impl_->btn_password_reset = new QPushButton("Password Reset", this);
     impl_->btn_export_csv = new QPushButton("Export CSV", this);
@@ -311,6 +315,7 @@ void MainWindow::setup_toolbar()
     toolbar->addWidget(impl_->btn_reboot);
     toolbar->addWidget(impl_->btn_change_password);
     toolbar->addWidget(impl_->btn_open_web);
+    toolbar->addWidget(impl_->btn_toggle_detail);
     toolbar->addWidget(impl_->btn_device_detail);
     toolbar->addWidget(impl_->btn_password_reset);
     toolbar->addSeparator();
@@ -349,6 +354,8 @@ void MainWindow::setup_connections()
             this, &MainWindow::on_change_password_clicked);
     connect(impl_->btn_open_web, &QPushButton::clicked,
             this, &MainWindow::on_open_web_clicked);
+    connect(impl_->btn_toggle_detail, &QPushButton::clicked,
+            this, &MainWindow::on_toggle_detail_clicked);
     connect(impl_->btn_device_detail, &QPushButton::clicked,
             this, &MainWindow::on_device_detail_clicked);
     connect(impl_->btn_password_reset, &QPushButton::clicked,
@@ -849,6 +856,19 @@ void MainWindow::on_open_web_clicked()
         return;
     }
     impl_->lbl_status->setText("Opened web login");
+}
+
+void MainWindow::on_toggle_detail_clicked()
+{
+    if (!impl_->detail_container || !impl_->splitter) return;
+    const bool will_show = impl_->detail_container->isHidden();
+    impl_->detail_container->setVisible(will_show);
+    impl_->btn_toggle_detail->setText(will_show ? "Hide Detail" : "Show Detail");
+    if (will_show) {
+        impl_->splitter->setSizes(QList<int>{900, 450});
+    } else {
+        impl_->splitter->setSizes(QList<int>{1400, 0});
+    }
 }
 
 void MainWindow::on_device_detail_clicked()

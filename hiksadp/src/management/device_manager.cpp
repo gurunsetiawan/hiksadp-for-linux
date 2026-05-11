@@ -8,6 +8,7 @@
 #include <mutex>
 #include <sstream>
 #include <unordered_map>
+#include <chrono>
 
 namespace hiksadp {
 
@@ -174,10 +175,35 @@ void DeviceManager::on_progress(ProgressCallback cb) {
 void DeviceManager::update_devices(const std::vector<Device>& devices) {
     DeviceListChangedCallback cb;
     std::vector<Device> snapshot;
+    const auto now = std::chrono::steady_clock::now();
+    constexpr auto kStaleAfter = std::chrono::seconds(30);
+    constexpr auto kPurgeAfter = std::chrono::seconds(90);
     {
         std::lock_guard lock{impl_->mutex};
         for (const auto& dev : devices) {
-            impl_->device_map[dev.mac_address.get()] = dev;
+            auto normalized = dev;
+            normalized.last_seen = now;
+
+            auto it = impl_->device_map.find(dev.mac_address.get());
+            if (it != impl_->device_map.end()) {
+                // Pertahankan state aktif lama bila refresh SADP mengembalikan state yang kurang lengkap.
+                if (is_active(it->second.state) && is_inactive(normalized.state)) {
+                    normalized.state = StateActive{};
+                }
+            }
+            impl_->device_map[dev.mac_address.get()] = std::move(normalized);
+        }
+
+        for (auto it = impl_->device_map.begin(); it != impl_->device_map.end();) {
+            const auto age = now - it->second.last_seen;
+            if (age > kPurgeAfter) {
+                it = impl_->device_map.erase(it);
+                continue;
+            }
+            if (age > kStaleAfter) {
+                it->second.state = StateError{"Stale (device tidak merespons pada scan terakhir)"};
+            }
+            ++it;
         }
         cb = impl_->cb_list_changed;
         snapshot = impl_->snapshot_devices();
