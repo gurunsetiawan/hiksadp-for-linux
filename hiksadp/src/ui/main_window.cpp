@@ -32,6 +32,7 @@ struct MainWindow::Impl {
     QPushButton* btn_activate{nullptr};
     QPushButton* btn_network{nullptr};
     QPushButton* btn_reboot{nullptr};
+    QPushButton* btn_change_password{nullptr};
     QPushButton* btn_password_reset{nullptr};
     QPushButton* btn_export_csv{nullptr};
     QPushButton* btn_export_xml{nullptr};
@@ -166,6 +167,7 @@ void MainWindow::setup_toolbar()
     impl_->btn_activate = new QPushButton("Activate", this);
     impl_->btn_network = new QPushButton("Network", this);
     impl_->btn_reboot = new QPushButton("Reboot", this);
+    impl_->btn_change_password = new QPushButton("Change Password", this);
     impl_->btn_password_reset = new QPushButton("Password Reset", this);
     impl_->btn_export_csv = new QPushButton("Export CSV", this);
     impl_->btn_export_xml = new QPushButton("Export XML", this);
@@ -180,6 +182,7 @@ void MainWindow::setup_toolbar()
     toolbar->addWidget(impl_->btn_activate);
     toolbar->addWidget(impl_->btn_network);
     toolbar->addWidget(impl_->btn_reboot);
+    toolbar->addWidget(impl_->btn_change_password);
     toolbar->addWidget(impl_->btn_password_reset);
     toolbar->addSeparator();
     toolbar->addWidget(impl_->search_edit);
@@ -213,6 +216,8 @@ void MainWindow::setup_connections()
             this, &MainWindow::on_network_config_clicked);
     connect(impl_->btn_reboot, &QPushButton::clicked,
             this, &MainWindow::on_reboot_clicked);
+    connect(impl_->btn_change_password, &QPushButton::clicked,
+            this, &MainWindow::on_change_password_clicked);
     connect(impl_->btn_password_reset, &QPushButton::clicked,
             this, &MainWindow::on_password_reset_clicked);
     connect(impl_->btn_export_csv, &QPushButton::clicked,
@@ -269,6 +274,7 @@ void MainWindow::update_action_states()
     impl_->btn_activate->setEnabled(has_selection);
     impl_->btn_network->setEnabled(has_selection);
     impl_->btn_reboot->setEnabled(has_selection);
+    impl_->btn_change_password->setEnabled(count == 1);
     impl_->btn_password_reset->setEnabled(count == 1);
 }
 
@@ -623,6 +629,66 @@ void MainWindow::on_reboot_clicked()
 
     impl_->lbl_status->setText(
         QString("Reboot done: %1 success, %2 failed").arg(success).arg(failed));
+}
+
+void MainWindow::on_change_password_clicked()
+{
+    const auto macs = selected_macs();
+    if (macs.size() != 1) {
+        show_info("Change Password", "Pilih tepat satu device.");
+        return;
+    }
+
+    bool ok = false;
+    const auto old_password = QInputDialog::getText(
+        this,
+        "Change Password",
+        "Masukkan password admin saat ini:",
+        QLineEdit::Password,
+        {},
+        &ok);
+    if (!ok || old_password.isEmpty()) return;
+
+    const auto new_password = QInputDialog::getText(
+        this,
+        "Change Password",
+        "Masukkan password admin baru:",
+        QLineEdit::Password,
+        {},
+        &ok);
+    if (!ok || new_password.isEmpty()) return;
+
+    const auto confirm_password = QInputDialog::getText(
+        this,
+        "Change Password",
+        "Ulangi password admin baru:",
+        QLineEdit::Password,
+        {},
+        &ok);
+    if (!ok || confirm_password.isEmpty()) return;
+
+    if (new_password != confirm_password) {
+        show_error("Change Password Error", "Konfirmasi password baru tidak cocok.");
+        return;
+    }
+    if (!is_strong_password(new_password.toStdString())) {
+        show_error("Change Password Error",
+                   "Password baru lemah. Gunakan minimal 8 karakter dan kombinasi >=3 kategori (huruf besar/kecil/angka/simbol).");
+        return;
+    }
+
+    const auto result = impl_->device_manager.change_admin_password(
+        macs.front(),
+        Password{old_password.toStdString()},
+        Password{new_password.toStdString()});
+    if (!result) {
+        show_error("Change Password Failed", QString::fromStdString(result.error().message()));
+        impl_->lbl_status->setText("Change password failed");
+        return;
+    }
+
+    show_info("Change Password", "Password admin berhasil diubah.");
+    impl_->lbl_status->setText("Password changed");
 }
 
 void MainWindow::on_password_reset_clicked()

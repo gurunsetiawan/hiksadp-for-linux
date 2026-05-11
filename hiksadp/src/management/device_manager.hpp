@@ -113,6 +113,11 @@ public:
     [[nodiscard]] Result<void>
     reboot_device(const MacAddress& mac, const Password& password);
 
+    [[nodiscard]] Result<void>
+    change_admin_password(const MacAddress& mac,
+                          const Password& old_password,
+                          const Password& new_password);
+
     [[nodiscard]] BatchResult
     reboot_batch(const std::vector<MacAddress>& macs, const Password& password);
 

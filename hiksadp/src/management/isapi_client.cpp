@@ -250,6 +250,45 @@ Result<void> IsapiClient::reboot_device(const IsapiCredential& cred)
         std::format("HTTP {}", resp.value().status_code));
 }
 
+Result<void> IsapiClient::change_password(const ChangePasswordRequest& req)
+{
+    if (req.target_username.empty()) {
+        return make_error<void>(ErrorCode::EmptyInput, "username kosong");
+    }
+    if (!is_strong_password(req.new_password.get())) {
+        return make_error<void>(ErrorCode::WeakPassword);
+    }
+
+    const std::string xml = std::format(
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<User>)"
+        R"(<id>1</id>)"
+        R"(<userName>{}</userName>)"
+        R"(<password>{}</password>)"
+        R"(</User>)",
+        req.target_username,
+        req.new_password.get());
+
+    auto resp = http_put(req.credential, "/ISAPI/Security/users/1", xml);
+    if (!resp) return std::unexpected(resp.error());
+
+    if (resp.value().is_ok()) return Result<void>{};
+    if (resp.value().status_code == 401) {
+        return make_error<void>(ErrorCode::AuthenticationFailed, "password lama salah");
+    }
+    if (resp.value().status_code == 403 || resp.value().status_code == 404 || resp.value().status_code == 501) {
+        return make_error<void>(
+            ErrorCode::UnexpectedResponse,
+            std::format("endpoint change password tidak didukung (HTTP {})", resp.value().status_code));
+    }
+    if (resp.value().status_code == 400) {
+        return make_error<void>(ErrorCode::WeakPassword, "password baru ditolak oleh policy device");
+    }
+
+    return make_error<void>(ErrorCode::UnexpectedResponse,
+        std::format("HTTP {}", resp.value().status_code));
+}
+
 Result<bool> IsapiClient::is_device_active(const IpAddress& ip, Port http_port)
 {
     if (!is_valid_ip(ip.get()))

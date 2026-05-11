@@ -45,6 +45,12 @@ struct NetworkConfigRequest {
     bool            dhcp_enabled{false};
 };
 
+struct ChangePasswordRequest {
+    IsapiCredential credential;
+    std::string     target_username{"admin"};
+    Password        new_password;
+};
+
 // ── IsapiClient — semua komunikasi ke device via HTTP ─────────────────────
 //
 // Setiap method mengembalikan Result<T> — caller wajib handle error.
@@ -83,6 +89,11 @@ public:
     // Endpoint: PUT /ISAPI/System/reboot
     [[nodiscard]] Result<void>
     reboot_device(const IsapiCredential& cred);
+
+    // ── Ganti password admin (password lama diketahui) ───────────────────
+    // Endpoint umum: PUT /ISAPI/Security/users/1
+    [[nodiscard]] Result<void>
+    change_password(const ChangePasswordRequest& req);
 
     // ── Cek apakah device aktif (bisa untuk polling status) ───────────────
     [[nodiscard]] Result<bool>

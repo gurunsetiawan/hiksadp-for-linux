@@ -380,6 +380,28 @@ Result<void> DeviceManager::reboot_device(const MacAddress& mac,
     return impl_->isapi.reboot_device(cred);
 }
 
+Result<void> DeviceManager::change_admin_password(const MacAddress& mac,
+                                                   const Password& old_password,
+                                                   const Password& new_password)
+{
+    std::optional<Device> dev;
+    {
+        std::lock_guard lock{impl_->mutex};
+        dev = impl_->find_device(mac);
+    }
+    if (!dev) return make_error<void>(ErrorCode::DeviceNotFound, mac.get());
+    if (is_inactive(dev->state))
+        return make_error<void>(ErrorCode::DeviceInactive);
+    if (!is_strong_password(new_password.get()))
+        return make_error<void>(ErrorCode::WeakPassword);
+
+    ChangePasswordRequest req;
+    req.credential = IsapiCredential{dev->network.ip, dev->network.http_port, old_password};
+    req.target_username = "admin";
+    req.new_password = new_password;
+    return impl_->isapi.change_password(req);
+}
+
 BatchResult DeviceManager::reboot_batch(const std::vector<MacAddress>& macs,
                                           const Password& password)
 {
