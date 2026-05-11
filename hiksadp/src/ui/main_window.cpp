@@ -59,6 +59,24 @@ struct MainWindow::Impl {
 
 static QString format_device_detail_text(const Device& dev)
 {
+    const auto support_lc = QString::fromStdString(dev.support_reset).toLower();
+    const auto mode_lc = QString::fromStdString(dev.password_reset_mode).toLower();
+    const bool supported =
+        support_lc.contains("true") || support_lc.contains("yes") || support_lc.contains("support");
+    const bool not_supported =
+        support_lc.contains("false") || support_lc.contains("no") || support_lc.contains("notsupport");
+    const bool likely_question_mode =
+        mode_lc.contains("question") || mode_lc.contains("qa") || mode_lc.contains("security");
+
+    QString recovery_flag;
+    if (supported || likely_question_mode) {
+        recovery_flag = "[SUPPORTED]";
+    } else if (not_supported) {
+        recovery_flag = "[NOT SUPPORTED]";
+    } else {
+        recovery_flag = "[UNKNOWN]";
+    }
+
     QString detail;
     detail += "Network\n";
     detail += "-------\n";
@@ -77,11 +95,62 @@ static QString format_device_detail_text(const Device& dev)
     detail += "Status: " + QString::fromStdString(dev.status_string()) + "\n\n";
     detail += "Recovery Capability\n";
     detail += "-------------------\n";
+    detail += "Status: " + recovery_flag + "\n";
     detail += "Reset Mode: " +
               (dev.password_reset_mode.empty() ? "-" : QString::fromStdString(dev.password_reset_mode)) + "\n";
     detail += "Reset Support: " +
               (dev.support_reset.empty() ? "-" : QString::fromStdString(dev.support_reset)) + "\n";
     return detail;
+}
+
+static QString format_device_detail_html(const Device& dev)
+{
+    const auto support_lc = QString::fromStdString(dev.support_reset).toLower();
+    const auto mode_lc = QString::fromStdString(dev.password_reset_mode).toLower();
+    const bool supported =
+        support_lc.contains("true") || support_lc.contains("yes") || support_lc.contains("support");
+    const bool not_supported =
+        support_lc.contains("false") || support_lc.contains("no") || support_lc.contains("notsupport");
+    const bool likely_question_mode =
+        mode_lc.contains("question") || mode_lc.contains("qa") || mode_lc.contains("security");
+
+    QString tag;
+    if (supported || likely_question_mode) {
+        tag = "<span style='color:#0f8a2b;font-weight:700'>SUPPORTED</span>";
+    } else if (not_supported) {
+        tag = "<span style='color:#b71c1c;font-weight:700'>NOT SUPPORTED</span>";
+    } else {
+        tag = "<span style='color:#a66a00;font-weight:700'>UNKNOWN</span>";
+    }
+
+    const auto mode = dev.password_reset_mode.empty()
+        ? QString("-")
+        : QString::fromStdString(dev.password_reset_mode).toHtmlEscaped();
+    const auto support = dev.support_reset.empty()
+        ? QString("-")
+        : QString::fromStdString(dev.support_reset).toHtmlEscaped();
+
+    QString html;
+    html += "<b>Network</b><br>";
+    html += "IP: " + QString::fromStdString(dev.network.ip.get()).toHtmlEscaped() + "<br>";
+    html += "Subnet: " + QString::fromStdString(dev.network.subnet_mask.get()).toHtmlEscaped() + "<br>";
+    html += "Gateway: " + QString::fromStdString(dev.network.gateway.get()).toHtmlEscaped() + "<br>";
+    html += "HTTP Port: " + QString::number(dev.network.http_port.get()) + "<br>";
+    html += "SDK Port: " + QString::number(dev.network.sdk_port.get()) + "<br><br>";
+
+    html += "<b>Identity</b><br>";
+    html += "MAC: " + QString::fromStdString(dev.mac_address.get()).toHtmlEscaped() + "<br>";
+    html += "Serial: " + QString::fromStdString(dev.serial_number.get()).toHtmlEscaped() + "<br>";
+    html += "Model: " + QString::fromStdString(dev.model).toHtmlEscaped() + "<br>";
+    html += "Type: " + QString::fromStdString(dev.device_type).toHtmlEscaped() + "<br>";
+    html += "Firmware: " + QString::fromStdString(dev.firmware_version.get()).toHtmlEscaped() + "<br>";
+    html += "Status: " + QString::fromStdString(dev.status_string()).toHtmlEscaped() + "<br><br>";
+
+    html += "<b>Recovery Capability</b><br>";
+    html += "Status: " + tag + "<br>";
+    html += "Reset Mode: " + mode + "<br>";
+    html += "Reset Support: " + support + "<br>";
+    return html;
 }
 
 static std::vector<std::pair<QString, QString>> export_columns()
@@ -204,7 +273,7 @@ void MainWindow::setup_ui()
     auto* detail_title = new QLabel("Device Detail", detail_container);
     impl_->detail_text = new QTextEdit(detail_container);
     impl_->detail_text->setReadOnly(true);
-    impl_->detail_text->setPlainText("Pilih satu device untuk melihat detail.");
+        impl_->detail_text->setHtml("Pilih satu device untuk melihat detail.");
     detail_layout->addWidget(detail_title);
     detail_layout->addWidget(impl_->detail_text);
 
@@ -1053,7 +1122,7 @@ void MainWindow::on_selection_changed()
     const auto macs = selected_macs();
     if (macs.size() != 1) {
         if (impl_->detail_text) {
-            impl_->detail_text->setPlainText("Pilih satu device untuk melihat detail.");
+            impl_->detail_text->setHtml("Pilih satu device untuk melihat detail.");
         }
         return;
     }
@@ -1061,12 +1130,12 @@ void MainWindow::on_selection_changed()
     auto dev = impl_->device_manager.find_by_mac(macs.front());
     if (!dev) {
         if (impl_->detail_text) {
-            impl_->detail_text->setPlainText("Device terpilih tidak ditemukan.");
+            impl_->detail_text->setHtml("Device terpilih tidak ditemukan.");
         }
         return;
     }
     if (impl_->detail_text) {
-        impl_->detail_text->setPlainText(format_device_detail_text(*dev));
+        impl_->detail_text->setHtml(format_device_detail_html(*dev));
     }
 }
 
