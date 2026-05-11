@@ -36,6 +36,7 @@ struct MainWindow::Impl {
     QPushButton* btn_reboot{nullptr};
     QPushButton* btn_change_password{nullptr};
     QPushButton* btn_open_web{nullptr};
+    QPushButton* btn_device_detail{nullptr};
     QPushButton* btn_password_reset{nullptr};
     QPushButton* btn_export_csv{nullptr};
     QPushButton* btn_export_xml{nullptr};
@@ -176,6 +177,7 @@ void MainWindow::setup_toolbar()
     impl_->btn_reboot = new QPushButton("Reboot", this);
     impl_->btn_change_password = new QPushButton("Change Password", this);
     impl_->btn_open_web = new QPushButton("Open Web", this);
+    impl_->btn_device_detail = new QPushButton("Device Detail", this);
     impl_->btn_password_reset = new QPushButton("Password Reset", this);
     impl_->btn_export_csv = new QPushButton("Export CSV", this);
     impl_->btn_export_xml = new QPushButton("Export XML", this);
@@ -192,6 +194,7 @@ void MainWindow::setup_toolbar()
     toolbar->addWidget(impl_->btn_reboot);
     toolbar->addWidget(impl_->btn_change_password);
     toolbar->addWidget(impl_->btn_open_web);
+    toolbar->addWidget(impl_->btn_device_detail);
     toolbar->addWidget(impl_->btn_password_reset);
     toolbar->addSeparator();
     toolbar->addWidget(impl_->search_edit);
@@ -229,6 +232,8 @@ void MainWindow::setup_connections()
             this, &MainWindow::on_change_password_clicked);
     connect(impl_->btn_open_web, &QPushButton::clicked,
             this, &MainWindow::on_open_web_clicked);
+    connect(impl_->btn_device_detail, &QPushButton::clicked,
+            this, &MainWindow::on_device_detail_clicked);
     connect(impl_->btn_password_reset, &QPushButton::clicked,
             this, &MainWindow::on_password_reset_clicked);
     connect(impl_->btn_export_csv, &QPushButton::clicked,
@@ -287,6 +292,7 @@ void MainWindow::update_action_states()
     impl_->btn_reboot->setEnabled(has_selection);
     impl_->btn_change_password->setEnabled(count == 1);
     impl_->btn_open_web->setEnabled(count == 1);
+    impl_->btn_device_detail->setEnabled(count == 1);
     impl_->btn_password_reset->setEnabled(count == 1);
 }
 
@@ -725,6 +731,40 @@ void MainWindow::on_open_web_clicked()
         return;
     }
     impl_->lbl_status->setText("Opened web login");
+}
+
+void MainWindow::on_device_detail_clicked()
+{
+    const auto macs = selected_macs();
+    if (macs.size() != 1) {
+        show_info("Device Detail", "Pilih tepat satu device.");
+        return;
+    }
+    auto dev = impl_->device_manager.find_by_mac(macs.front());
+    if (!dev) {
+        show_error("Device Detail Error", "Device tidak ditemukan.");
+        return;
+    }
+
+    QString detail;
+    detail += "IP: " + QString::fromStdString(dev->network.ip.get()) + "\n";
+    detail += "Subnet: " + QString::fromStdString(dev->network.subnet_mask.get()) + "\n";
+    detail += "Gateway: " + QString::fromStdString(dev->network.gateway.get()) + "\n";
+    detail += "HTTP Port: " + QString::number(dev->network.http_port.get()) + "\n";
+    detail += "SDK Port: " + QString::number(dev->network.sdk_port.get()) + "\n\n";
+    detail += "MAC: " + QString::fromStdString(dev->mac_address.get()) + "\n";
+    detail += "Serial: " + QString::fromStdString(dev->serial_number.get()) + "\n";
+    detail += "Model: " + QString::fromStdString(dev->model) + "\n";
+    detail += "Device Type: " + QString::fromStdString(dev->device_type) + "\n";
+    detail += "Firmware: " + QString::fromStdString(dev->firmware_version.get()) + "\n";
+    detail += "Status: " + QString::fromStdString(dev->status_string()) + "\n\n";
+    detail += "Reset Mode: " +
+              (dev->password_reset_mode.empty() ? "-" : QString::fromStdString(dev->password_reset_mode)) + "\n";
+    detail += "Reset Support: " +
+              (dev->support_reset.empty() ? "-" : QString::fromStdString(dev->support_reset)) + "\n";
+
+    show_info("Device Detail", detail);
+    impl_->lbl_status->setText("Device detail viewed");
 }
 
 void MainWindow::on_password_reset_clicked()
