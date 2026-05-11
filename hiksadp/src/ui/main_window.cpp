@@ -1,5 +1,6 @@
 #include "ui/main_window.hpp"
 
+#include "management/password_reset_service.hpp"
 #include "ui/device_table.hpp"
 
 #include <QApplication>
@@ -21,7 +22,6 @@
 #include <QTextStream>
 #include <QToolBar>
 #include <QDateTime>
-#include <QRegularExpression>
 
 namespace hiksadp::ui {
 
@@ -43,6 +43,7 @@ struct MainWindow::Impl {
     QProgressBar* progress{nullptr};
 
     DeviceManager device_manager;
+    PasswordResetService password_reset_service;
     protocol::SadpDiscovery scanner;
 };
 
@@ -660,15 +661,15 @@ void MainWindow::on_password_reset_clicked()
             return;
         }
 
-        const auto now = QDateTime::currentDateTime().toString(Qt::ISODate);
+        const auto now = QDateTime::currentDateTime().toString(Qt::ISODate).toStdString();
+        const auto xml_result = impl_->password_reset_service.build_request_xml(*dev, now);
+        if (!xml_result) {
+            show_error("Password Reset Error", QString::fromStdString(xml_result.error().message()));
+            return;
+        }
+
         QTextStream out(&file);
-        out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-        out << "<PasswordResetRequest>\n";
-        out << "  <DeviceSN>" << escape_xml(QString::fromStdString(dev->serial_number.get())) << "</DeviceSN>\n";
-        out << "  <MAC>" << escape_xml(QString::fromStdString(dev->mac_address.get())) << "</MAC>\n";
-        out << "  <IPv4Address>" << escape_xml(QString::fromStdString(dev->network.ip.get())) << "</IPv4Address>\n";
-        out << "  <Timestamp>" << escape_xml(now) << "</Timestamp>\n";
-        out << "</PasswordResetRequest>\n";
+        out << QString::fromStdString(xml_result.value());
 
         show_info("Password Reset", "Request XML berhasil dibuat.");
         impl_->lbl_status->setText("Password reset request exported");
@@ -684,24 +685,18 @@ void MainWindow::on_password_reset_clicked()
         show_error("Password Reset Error", "Gagal membaca response XML.");
         return;
     }
-    const QString xml = QString::fromUtf8(file.readAll());
-
-    const auto sn_match =
-        QRegularExpression("<(DeviceSN|SerialNumber)>([^<]+)</(DeviceSN|SerialNumber)>").match(xml);
-    const auto date_match =
-        QRegularExpression("<(Date|Timestamp)>([^<]+)</(Date|Timestamp)>").match(xml);
-    const auto code_match =
-        QRegularExpression("<(ResetCode|SecurityCode|Code)>([^<]+)</(ResetCode|SecurityCode|Code)>").match(xml);
-
-    if (!sn_match.hasMatch()) {
-        show_error("Password Reset Error", "Response XML tidak valid: serial number tidak ditemukan.");
+    const auto parse_result =
+        impl_->password_reset_service.parse_response_xml(QString::fromUtf8(file.readAll()).toStdString());
+    if (!parse_result) {
+        show_error("Password Reset Error", QString::fromStdString(parse_result.error().message()));
         return;
     }
 
+    const auto& parsed = parse_result.value();
     QString summary = "Response XML berhasil diimport.\n";
-    summary += "Serial: " + sn_match.captured(2) + "\n";
-    if (date_match.hasMatch()) summary += "Date/Timestamp: " + date_match.captured(2) + "\n";
-    if (code_match.hasMatch()) summary += "Reset Code: " + code_match.captured(2) + "\n";
+    summary += "Serial: " + QString::fromStdString(parsed.serial) + "\n";
+    if (!parsed.timestamp.empty()) summary += "Date/Timestamp: " + QString::fromStdString(parsed.timestamp) + "\n";
+    if (!parsed.reset_code.empty()) summary += "Reset Code: " + QString::fromStdString(parsed.reset_code) + "\n";
     summary += "\nCatatan: apply reset code ke device belum diimplementasikan (M3 next step).";
 
     show_info("Password Reset", summary);

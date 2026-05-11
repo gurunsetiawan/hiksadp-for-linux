@@ -26,6 +26,8 @@ target_link_libraries(hiksadp_protocol
 add_library(hiksadp_management STATIC
   management/isapi_client.hpp
   management/isapi_client.cpp
+  management/password_reset_service.hpp
+  management/password_reset_service.cpp
   management/device_manager.hpp
   management/device_manager.cpp
 )
