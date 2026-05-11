@@ -705,29 +705,56 @@ void MainWindow::on_password_reset_clicked()
         return;
     }
 
-    const auto action = QMessageBox::question(
-        this,
-        "Password Reset",
-        "Pilih Yes untuk generate request XML.\nPilih No untuk import response XML.",
-        QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel,
-        QMessageBox::Yes);
-
-    if (action == QMessageBox::Cancel) {
-        return;
-    }
-
     const auto mode_lc = QString::fromStdString(dev->password_reset_mode).toLower();
     const bool supports_security_questions =
         mode_lc.contains("question") || mode_lc.contains("qa") || mode_lc.contains("security");
-    if (supports_security_questions) {
-        show_info(
-            "Password Reset Mode",
-            "Device melaporkan mode reset berbasis security questions tersedia.\n"
-            "Saat ini aplikasi ini baru otomatis untuk flow XML/security-code.\n"
-            "Flow question-answer masih perlu implement endpoint per firmware/model.");
+
+    QString mode_info = "Recovery info dari SADP:\n";
+    mode_info += "PasswordResetModeSecond: " +
+                 (dev->password_reset_mode.empty()
+                      ? QString("-")
+                      : QString::fromStdString(dev->password_reset_mode)) +
+                 "\n";
+    mode_info += "Support: " +
+                 (dev->support_reset.empty()
+                      ? QString("-")
+                      : QString::fromStdString(dev->support_reset)) +
+                 "\n\n";
+    mode_info += "Pilih metode recovery:";
+
+    bool ok = false;
+    const QStringList methods = {
+        "Security Code XML - Export Request",
+        "Security Code XML - Import Response",
+        "Security Questions (device-side)"
+    };
+    const auto chosen = QInputDialog::getItem(
+        this,
+        "Password Recovery Methods",
+        mode_info,
+        methods,
+        0,
+        false,
+        &ok);
+    if (!ok || chosen.isEmpty()) return;
+
+    if (chosen == "Security Questions (device-side)") {
+        if (supports_security_questions) {
+            show_info(
+                "Security Questions",
+                "Device terdeteksi mendukung security questions.\n"
+                "Untuk saat ini, jalankan flow ini dari UI web/local GUI resmi device.\n"
+                "Integrasi question-answer langsung dari aplikasi ini belum diimplementasikan.");
+        } else {
+            show_info(
+                "Security Questions",
+                "Dari respons SADP, mode security questions tidak terdeteksi pada device ini.\n"
+                "Coba metode XML/security code atau change password (jika masih tahu password lama).");
+        }
+        return;
     }
 
-    if (action == QMessageBox::Yes) {
+    if (chosen == "Security Code XML - Export Request") {
         const auto path = QFileDialog::getSaveFileName(
             this, "Save Reset Request XML", "reset_request.xml", "XML Files (*.xml)");
         if (path.isEmpty()) return;
@@ -753,6 +780,7 @@ void MainWindow::on_password_reset_clicked()
         return;
     }
 
+    // Security Code XML - Import Response
     const auto path = QFileDialog::getOpenFileName(
         this, "Import Reset Response XML", {}, "XML Files (*.xml)");
     if (path.isEmpty()) return;
@@ -781,7 +809,7 @@ void MainWindow::on_password_reset_clicked()
         return;
     }
 
-    bool ok = false;
+    ok = false;
     const auto new_password = QInputDialog::getText(
         this,
         "Apply Password Reset",
