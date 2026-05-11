@@ -116,6 +116,12 @@ public:
     [[nodiscard]] BatchResult
     reboot_batch(const std::vector<MacAddress>& macs, const Password& password);
 
+    // ── Password reset via SADP security code ────────────────────────────
+    [[nodiscard]] Result<void>
+    apply_password_reset_code(const MacAddress& mac,
+                              const std::string& reset_code,
+                              const Password& new_password);
+
     // ── Export ────────────────────────────────────────────────────────────
 
     [[nodiscard]] Result<std::string> export_csv() const;

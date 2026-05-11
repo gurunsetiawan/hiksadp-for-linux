@@ -697,10 +697,50 @@ void MainWindow::on_password_reset_clicked()
     summary += "Serial: " + QString::fromStdString(parsed.serial) + "\n";
     if (!parsed.timestamp.empty()) summary += "Date/Timestamp: " + QString::fromStdString(parsed.timestamp) + "\n";
     if (!parsed.reset_code.empty()) summary += "Reset Code: " + QString::fromStdString(parsed.reset_code) + "\n";
-    summary += "\nCatatan: apply reset code ke device belum diimplementasikan (M3 next step).";
-
     show_info("Password Reset", summary);
-    impl_->lbl_status->setText("Password reset response imported");
+
+    if (parsed.reset_code.empty()) {
+        show_error("Password Reset Error", "Response XML tidak berisi reset/security code.");
+        return;
+    }
+
+    bool ok = false;
+    const auto new_password = QInputDialog::getText(
+        this,
+        "Apply Password Reset",
+        "Masukkan password admin BARU yang akan diset ke device:",
+        QLineEdit::Password,
+        {},
+        &ok);
+    if (!ok || new_password.isEmpty()) {
+        impl_->lbl_status->setText("Password reset response imported");
+        return;
+    }
+
+    const auto confirm = QMessageBox::question(
+        this,
+        "Confirm Password Reset",
+        "Apply security code ke device sekarang?",
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No);
+    if (confirm != QMessageBox::Yes) {
+        impl_->lbl_status->setText("Password reset response imported");
+        return;
+    }
+
+    const auto apply = impl_->device_manager.apply_password_reset_code(
+        macs.front(),
+        parsed.reset_code,
+        Password{new_password.toStdString()});
+
+    if (!apply) {
+        show_error("Password Reset Failed", QString::fromStdString(apply.error().message()));
+        impl_->lbl_status->setText("Password reset failed");
+        return;
+    }
+
+    show_info("Password Reset", "Password reset berhasil diterapkan ke device.");
+    impl_->lbl_status->setText("Password reset applied");
 }
 
 void MainWindow::on_export_csv_clicked()

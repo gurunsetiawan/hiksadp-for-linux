@@ -1,4 +1,7 @@
 #include "device_manager.hpp"
+#include <QByteArray>
+#include <QHostAddress>
+#include <QUdpSocket>
 #include <algorithm>
 #include <format>
 #include <cstdio>
@@ -7,6 +10,108 @@
 #include <unordered_map>
 
 namespace hiksadp {
+
+namespace {
+std::string escape_xml_text(const std::string& in)
+{
+    std::string out;
+    out.reserve(in.size());
+    for (const char c : in) {
+        switch (c) {
+            case '&': out += "&amp;"; break;
+            case '<': out += "&lt;"; break;
+            case '>': out += "&gt;"; break;
+            case '"': out += "&quot;"; break;
+            case '\'': out += "&apos;"; break;
+            default: out.push_back(c); break;
+        }
+    }
+    return out;
+}
+
+Result<void> send_sadp_reset_command(const Device& dev,
+                                     const std::string& reset_code,
+                                     const Password& new_password)
+{
+    if (reset_code.empty()) {
+        return make_error<void>(ErrorCode::EmptyInput, "reset code kosong");
+    }
+    if (!is_strong_password(new_password.get())) {
+        return make_error<void>(ErrorCode::WeakPassword);
+    }
+
+    QUdpSocket socket;
+    if (!socket.bind(QHostAddress::AnyIPv4, 0,
+                     QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint)) {
+        return make_error<void>(ErrorCode::SocketBindFailed, socket.errorString().toStdString());
+    }
+
+    const auto xml = std::format(
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+        "<Probe>"
+        "<Uuid>hiksadp-reset</Uuid>"
+        "<MAC>{}</MAC>"
+        "<Types>securityCode</Types>"
+        "<SecurityCode>{}</SecurityCode>"
+        "<Password>{}</Password>"
+        "</Probe>",
+        dev.mac_address.get(),
+        escape_xml_text(reset_code),
+        escape_xml_text(new_password.get()));
+
+    const auto target_ip = QHostAddress{QString::fromStdString(dev.network.ip.get())};
+    const auto sent = socket.writeDatagram(QByteArray::fromStdString(xml), target_ip, ports::SADP_DISCOVERY.get());
+    if (sent <= 0) {
+        return make_error<void>(ErrorCode::BroadcastFailed, socket.errorString().toStdString());
+    }
+    if (!socket.waitForReadyRead(5000)) {
+        return make_error<void>(
+            ErrorCode::OperationTimeout,
+            "tidak ada respons SADP reset (fitur mungkin tidak didukung firmware ini)");
+    }
+
+    QByteArray datagram;
+    datagram.resize(static_cast<qsizetype>(socket.pendingDatagramSize()));
+    QHostAddress from_addr;
+    quint16 from_port = 0;
+    socket.readDatagram(datagram.data(), datagram.size(), &from_addr, &from_port);
+    const auto resp = QString::fromUtf8(datagram).toStdString();
+
+    const auto from_same = from_addr.toString().toStdString() == dev.network.ip.get();
+    if (!from_same) {
+        return make_error<void>(ErrorCode::UnexpectedResponse, "menerima respons dari device lain");
+    }
+
+    const auto ok_hit =
+        (resp.find("<Result>OK</Result>") != std::string::npos) ||
+        (resp.find("<statusValue>200</statusValue>") != std::string::npos) ||
+        (resp.find("<SubStatusCode>ok</SubStatusCode>") != std::string::npos);
+    if (ok_hit) {
+        return Result<void>{};
+    }
+
+    // Capability/error detection dari payload response.
+    if (resp.find("notSupport") != std::string::npos ||
+        resp.find("not support") != std::string::npos ||
+        resp.find("OperationNotSupported") != std::string::npos) {
+        return make_error<void>(
+            ErrorCode::UnexpectedResponse,
+            "password reset via SADP tidak didukung device/firmware ini");
+    }
+    if (resp.find("Invalid SecurityCode") != std::string::npos ||
+        resp.find("invalid security code") != std::string::npos) {
+        return make_error<void>(ErrorCode::AuthenticationFailed, "security code tidak valid");
+    }
+    if (resp.find("password") != std::string::npos &&
+        resp.find("weak") != std::string::npos) {
+        return make_error<void>(ErrorCode::WeakPassword);
+    }
+
+    return make_error<void>(
+        ErrorCode::UnexpectedResponse,
+        "respons reset SADP tidak dikenali");
+}
+} // namespace
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -298,6 +403,21 @@ BatchResult DeviceManager::reboot_batch(const std::vector<MacAddress>& macs,
         batch.items.push_back(std::move(item));
     }
     return batch;
+}
+
+Result<void> DeviceManager::apply_password_reset_code(const MacAddress& mac,
+                                                       const std::string& reset_code,
+                                                       const Password& new_password)
+{
+    std::optional<Device> dev;
+    {
+        std::lock_guard lock{impl_->mutex};
+        dev = impl_->find_device(mac);
+    }
+    if (!dev) {
+        return make_error<void>(ErrorCode::DeviceNotFound, mac.get());
+    }
+    return send_sadp_reset_command(*dev, reset_code, new_password);
 }
 
 // ── Export ─────────────────────────────────────────────────────────────────
