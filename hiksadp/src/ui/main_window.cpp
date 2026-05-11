@@ -21,6 +21,7 @@
 #include <QTextStream>
 #include <QToolBar>
 #include <QDateTime>
+#include <QRegularExpression>
 
 namespace hiksadp::ui {
 
@@ -31,6 +32,7 @@ struct MainWindow::Impl {
     QPushButton* btn_activate{nullptr};
     QPushButton* btn_network{nullptr};
     QPushButton* btn_reboot{nullptr};
+    QPushButton* btn_password_reset{nullptr};
     QPushButton* btn_export_csv{nullptr};
     QPushButton* btn_export_xml{nullptr};
     QLineEdit* search_edit{nullptr};
@@ -163,6 +165,7 @@ void MainWindow::setup_toolbar()
     impl_->btn_activate = new QPushButton("Activate", this);
     impl_->btn_network = new QPushButton("Network", this);
     impl_->btn_reboot = new QPushButton("Reboot", this);
+    impl_->btn_password_reset = new QPushButton("Password Reset", this);
     impl_->btn_export_csv = new QPushButton("Export CSV", this);
     impl_->btn_export_xml = new QPushButton("Export XML", this);
     impl_->search_edit = new QLineEdit(this);
@@ -176,6 +179,7 @@ void MainWindow::setup_toolbar()
     toolbar->addWidget(impl_->btn_activate);
     toolbar->addWidget(impl_->btn_network);
     toolbar->addWidget(impl_->btn_reboot);
+    toolbar->addWidget(impl_->btn_password_reset);
     toolbar->addSeparator();
     toolbar->addWidget(impl_->search_edit);
     toolbar->addWidget(impl_->status_filter);
@@ -208,6 +212,8 @@ void MainWindow::setup_connections()
             this, &MainWindow::on_network_config_clicked);
     connect(impl_->btn_reboot, &QPushButton::clicked,
             this, &MainWindow::on_reboot_clicked);
+    connect(impl_->btn_password_reset, &QPushButton::clicked,
+            this, &MainWindow::on_password_reset_clicked);
     connect(impl_->btn_export_csv, &QPushButton::clicked,
             this, &MainWindow::on_export_csv_clicked);
     connect(impl_->btn_export_xml, &QPushButton::clicked,
@@ -262,6 +268,7 @@ void MainWindow::update_action_states()
     impl_->btn_activate->setEnabled(has_selection);
     impl_->btn_network->setEnabled(has_selection);
     impl_->btn_reboot->setEnabled(has_selection);
+    impl_->btn_password_reset->setEnabled(count == 1);
 }
 
 std::vector<hiksadp::MacAddress> MainWindow::selected_macs() const
@@ -615,6 +622,90 @@ void MainWindow::on_reboot_clicked()
 
     impl_->lbl_status->setText(
         QString("Reboot done: %1 success, %2 failed").arg(success).arg(failed));
+}
+
+void MainWindow::on_password_reset_clicked()
+{
+    const auto macs = selected_macs();
+    if (macs.size() != 1) {
+        show_info("Password Reset", "Pilih tepat satu device untuk password reset.");
+        return;
+    }
+
+    auto dev = impl_->device_manager.find_by_mac(macs.front());
+    if (!dev) {
+        show_error("Password Reset Error", "Device tidak ditemukan.");
+        return;
+    }
+
+    const auto action = QMessageBox::question(
+        this,
+        "Password Reset",
+        "Pilih Yes untuk generate request XML.\nPilih No untuk import response XML.",
+        QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel,
+        QMessageBox::Yes);
+
+    if (action == QMessageBox::Cancel) {
+        return;
+    }
+
+    if (action == QMessageBox::Yes) {
+        const auto path = QFileDialog::getSaveFileName(
+            this, "Save Reset Request XML", "reset_request.xml", "XML Files (*.xml)");
+        if (path.isEmpty()) return;
+
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            show_error("Password Reset Error", "Gagal membuat file request XML.");
+            return;
+        }
+
+        const auto now = QDateTime::currentDateTime().toString(Qt::ISODate);
+        QTextStream out(&file);
+        out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        out << "<PasswordResetRequest>\n";
+        out << "  <DeviceSN>" << escape_xml(QString::fromStdString(dev->serial_number.get())) << "</DeviceSN>\n";
+        out << "  <MAC>" << escape_xml(QString::fromStdString(dev->mac_address.get())) << "</MAC>\n";
+        out << "  <IPv4Address>" << escape_xml(QString::fromStdString(dev->network.ip.get())) << "</IPv4Address>\n";
+        out << "  <Timestamp>" << escape_xml(now) << "</Timestamp>\n";
+        out << "</PasswordResetRequest>\n";
+
+        show_info("Password Reset", "Request XML berhasil dibuat.");
+        impl_->lbl_status->setText("Password reset request exported");
+        return;
+    }
+
+    const auto path = QFileDialog::getOpenFileName(
+        this, "Import Reset Response XML", {}, "XML Files (*.xml)");
+    if (path.isEmpty()) return;
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        show_error("Password Reset Error", "Gagal membaca response XML.");
+        return;
+    }
+    const QString xml = QString::fromUtf8(file.readAll());
+
+    const auto sn_match =
+        QRegularExpression("<(DeviceSN|SerialNumber)>([^<]+)</(DeviceSN|SerialNumber)>").match(xml);
+    const auto date_match =
+        QRegularExpression("<(Date|Timestamp)>([^<]+)</(Date|Timestamp)>").match(xml);
+    const auto code_match =
+        QRegularExpression("<(ResetCode|SecurityCode|Code)>([^<]+)</(ResetCode|SecurityCode|Code)>").match(xml);
+
+    if (!sn_match.hasMatch()) {
+        show_error("Password Reset Error", "Response XML tidak valid: serial number tidak ditemukan.");
+        return;
+    }
+
+    QString summary = "Response XML berhasil diimport.\n";
+    summary += "Serial: " + sn_match.captured(2) + "\n";
+    if (date_match.hasMatch()) summary += "Date/Timestamp: " + date_match.captured(2) + "\n";
+    if (code_match.hasMatch()) summary += "Reset Code: " + code_match.captured(2) + "\n";
+    summary += "\nCatatan: apply reset code ke device belum diimplementasikan (M3 next step).";
+
+    show_info("Password Reset", summary);
+    impl_->lbl_status->setText("Password reset response imported");
 }
 
 void MainWindow::on_export_csv_clicked()
