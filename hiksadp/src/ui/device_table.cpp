@@ -5,6 +5,7 @@
 #include <QHeaderView>
 #include <QTableWidgetItem>
 #include <QFont>
+#include <QSignalBlocker>
 
 namespace hiksadp::ui {
 
@@ -127,6 +128,20 @@ void DeviceTableWidget::apply_row_style(int row, const Device& device)
 
 void DeviceTableWidget::set_devices(const std::vector<Device>& devices)
 {
+    // Simpan selection berdasarkan MAC supaya tidak hilang saat auto-refresh.
+    std::vector<QString> selected_before;
+    {
+        const auto selected_rows = selectionModel()->selectedRows();
+        selected_before.reserve(static_cast<std::size_t>(selected_rows.size()));
+        for (const auto& idx : selected_rows) {
+            auto* item = this->item(idx.row(), static_cast<int>(Column::MacAddress));
+            if (item) {
+                selected_before.push_back(item->data(Qt::UserRole).toString());
+            }
+        }
+    }
+
+    const QSignalBlocker blocker{selectionModel()};
     setSortingEnabled(false);
     clearContents();
     setRowCount(static_cast<int>(devices.size()));
@@ -139,6 +154,16 @@ void DeviceTableWidget::set_devices(const std::vector<Device>& devices)
     setSortingEnabled(true);
     // Re-number setelah sort
     sortByColumn(static_cast<int>(Column::IpAddress), Qt::AscendingOrder);
+
+    // Restore selection by MAC setelah data baru masuk.
+    for (int row = 0; row < rowCount(); ++row) {
+        auto* item = this->item(row, static_cast<int>(Column::MacAddress));
+        if (!item) continue;
+        const auto mac = item->data(Qt::UserRole).toString();
+        if (std::find(selected_before.begin(), selected_before.end(), mac) != selected_before.end()) {
+            selectRow(row);
+        }
+    }
 }
 
 void DeviceTableWidget::upsert_device(const Device& device)
