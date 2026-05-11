@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <chrono>
 
 namespace hiksadp {
 
@@ -76,6 +77,12 @@ public:
     // Cari device berdasarkan MAC
     [[nodiscard]] std::optional<Device>
     find_by_mac(const MacAddress& mac) const;
+
+    // Retention policy untuk hasil discovery
+    void set_retention_policy(std::chrono::seconds stale_after,
+                              std::chrono::seconds purge_after);
+    [[nodiscard]] std::pair<std::chrono::seconds, std::chrono::seconds>
+    retention_policy() const;
 
     // ── Aktivasi ──────────────────────────────────────────────────────────
 

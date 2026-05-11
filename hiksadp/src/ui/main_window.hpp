@@ -42,6 +42,7 @@ private Q_SLOTS:
     void on_reboot_clicked();
     void on_change_password_clicked();
     void on_open_web_clicked();
+    void on_scan_settings_clicked();
     void on_toggle_detail_clicked();
     void on_device_detail_clicked();
     void on_password_reset_clicked();

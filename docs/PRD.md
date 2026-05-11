@@ -24,12 +24,14 @@ Teknisi Linux membutuhkan tool native untuk discovery dan konfigurasi perangkat 
 
 ## 5. Functional Requirements
 ### 5.1 Discovery
-- Scan SADP pada interface aktif (multicast + broadcast).
+- Scan SADP pada semua interface aktif (multicast + broadcast) sebagai default.
 - Menampilkan device info: IP, MAC, serial, model, firmware, status.
 - Auto refresh periodik.
 - Device retention policy:
   - stale setelah 30 detik tidak terlihat
   - purge setelah 90 detik tidak terlihat.
+- Retention policy dapat diatur dari UI (Scan Settings).
+- Catatan keputusan: selector interface spesifik tidak menjadi alur utama v1, untuk menjaga kemudahan teknisi lapangan. Mode spesifik interface dipertimbangkan sebagai advanced option di versi berikutnya.
 
 ### 5.2 Device Operations
 - Activate single/batch.
@@ -82,5 +84,5 @@ Teknisi Linux membutuhkan tool native untuk discovery dan konfigurasi perangkat 
 - Recovery XML flow dapat dipakai teknisi lapangan.
 
 ## 10. Open Items
-- Menjadikan stale/purge TTL configurable dari UI.
 - Security Questions full flow per firmware matrix.
+- Advanced mode: optional single-interface scan selector (non-default).

@@ -139,6 +139,8 @@ struct DeviceManager::Impl {
     std::unordered_map<std::string, Device> device_map; // key = MAC string
 
     IsapiClient isapi;
+    std::chrono::seconds stale_after{30};
+    std::chrono::seconds purge_after{90};
 
     DeviceManager::DeviceListChangedCallback cb_list_changed;
     DeviceManager::ProgressCallback          cb_progress;
@@ -176,10 +178,12 @@ void DeviceManager::update_devices(const std::vector<Device>& devices) {
     DeviceListChangedCallback cb;
     std::vector<Device> snapshot;
     const auto now = std::chrono::steady_clock::now();
-    constexpr auto kStaleAfter = std::chrono::seconds(30);
-    constexpr auto kPurgeAfter = std::chrono::seconds(90);
+    std::chrono::seconds stale_after;
+    std::chrono::seconds purge_after;
     {
         std::lock_guard lock{impl_->mutex};
+        stale_after = impl_->stale_after;
+        purge_after = impl_->purge_after;
         for (const auto& dev : devices) {
             auto normalized = dev;
             normalized.last_seen = now;
@@ -196,11 +200,11 @@ void DeviceManager::update_devices(const std::vector<Device>& devices) {
 
         for (auto it = impl_->device_map.begin(); it != impl_->device_map.end();) {
             const auto age = now - it->second.last_seen;
-            if (age > kPurgeAfter) {
+            if (age > purge_after) {
                 it = impl_->device_map.erase(it);
                 continue;
             }
-            if (age > kStaleAfter) {
+            if (age > stale_after) {
                 it->second.state = StateError{"Stale (device tidak merespons pada scan terakhir)"};
             }
             ++it;
@@ -209,6 +213,23 @@ void DeviceManager::update_devices(const std::vector<Device>& devices) {
         snapshot = impl_->snapshot_devices();
     }
     if (cb) cb(snapshot);
+}
+
+void DeviceManager::set_retention_policy(std::chrono::seconds stale_after,
+                                         std::chrono::seconds purge_after)
+{
+    if (stale_after < std::chrono::seconds{5}) stale_after = std::chrono::seconds{5};
+    if (purge_after <= stale_after) purge_after = stale_after + std::chrono::seconds{5};
+    std::lock_guard lock{impl_->mutex};
+    impl_->stale_after = stale_after;
+    impl_->purge_after = purge_after;
+}
+
+std::pair<std::chrono::seconds, std::chrono::seconds>
+DeviceManager::retention_policy() const
+{
+    std::lock_guard lock{impl_->mutex};
+    return {impl_->stale_after, impl_->purge_after};
 }
 
 std::vector<Device> DeviceManager::devices() const {

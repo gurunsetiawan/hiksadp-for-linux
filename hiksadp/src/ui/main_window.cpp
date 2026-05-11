@@ -28,6 +28,7 @@
 #include <QTextEdit>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <chrono>
 
 namespace hiksadp::ui {
 
@@ -38,6 +39,7 @@ struct MainWindow::Impl {
     QWidget* detail_container{nullptr};
 
     QPushButton* btn_scan{nullptr};
+    QPushButton* btn_scan_settings{nullptr};
     QPushButton* btn_activate{nullptr};
     QPushButton* btn_network{nullptr};
     QPushButton* btn_reboot{nullptr};
@@ -292,6 +294,7 @@ void MainWindow::setup_toolbar()
     auto* toolbar = addToolBar("Main");
 
     impl_->btn_scan = new QPushButton("Scan", this);
+    impl_->btn_scan_settings = new QPushButton("Scan Settings", this);
     impl_->btn_activate = new QPushButton("Activate", this);
     impl_->btn_network = new QPushButton("Network", this);
     impl_->btn_reboot = new QPushButton("Reboot", this);
@@ -310,6 +313,7 @@ void MainWindow::setup_toolbar()
     impl_->status_filter->addItems({"All", "Active", "Inactive"});
 
     toolbar->addWidget(impl_->btn_scan);
+    toolbar->addWidget(impl_->btn_scan_settings);
     toolbar->addWidget(impl_->btn_activate);
     toolbar->addWidget(impl_->btn_network);
     toolbar->addWidget(impl_->btn_reboot);
@@ -344,6 +348,8 @@ void MainWindow::setup_connections()
 {
     connect(impl_->btn_scan, &QPushButton::clicked,
             this, &MainWindow::on_scan_clicked);
+    connect(impl_->btn_scan_settings, &QPushButton::clicked,
+            this, &MainWindow::on_scan_settings_clicked);
     connect(impl_->btn_activate, &QPushButton::clicked,
             this, &MainWindow::on_activate_clicked);
     connect(impl_->btn_network, &QPushButton::clicked,
@@ -439,6 +445,52 @@ void MainWindow::on_scan_clicked()
         impl_->btn_scan->setEnabled(true);
         show_error("Scan Error", QString::fromStdString(result.error().message()));
     }
+}
+
+void MainWindow::on_scan_settings_clicked()
+{
+    auto [stale_after, purge_after] = impl_->device_manager.retention_policy();
+
+    QDialog dialog(this);
+    dialog.setWindowTitle("Scan Settings");
+    dialog.setModal(true);
+
+    auto* form = new QFormLayout(&dialog);
+    auto* stale_edit = new QLineEdit(QString::number(stale_after.count()), &dialog);
+    auto* purge_edit = new QLineEdit(QString::number(purge_after.count()), &dialog);
+    auto* note = new QLabel("Unit: detik. Syarat: purge harus lebih besar dari stale.", &dialog);
+    note->setWordWrap(true);
+
+    form->addRow("Stale after (s)", stale_edit);
+    form->addRow("Purge after (s)", purge_edit);
+    form->addRow(note);
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    form->addRow(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+    if (dialog.exec() != QDialog::Accepted) return;
+
+    bool ok_stale = false;
+    bool ok_purge = false;
+    const int stale_s = stale_edit->text().trimmed().toInt(&ok_stale);
+    const int purge_s = purge_edit->text().trimmed().toInt(&ok_purge);
+
+    if (!ok_stale || !ok_purge || stale_s <= 0 || purge_s <= 0) {
+        show_error("Scan Settings Error", "Nilai stale/purge harus angka positif.");
+        return;
+    }
+    if (purge_s <= stale_s) {
+        show_error("Scan Settings Error", "Purge harus lebih besar dari stale.");
+        return;
+    }
+
+    impl_->device_manager.set_retention_policy(
+        std::chrono::seconds{stale_s},
+        std::chrono::seconds{purge_s});
+    impl_->lbl_status->setText(
+        QString("Scan retention updated: stale=%1s purge=%2s").arg(stale_s).arg(purge_s));
 }
 
 void MainWindow::on_activate_clicked()
