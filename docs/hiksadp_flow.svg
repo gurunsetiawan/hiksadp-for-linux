@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="980" viewBox="0 0 1400 980">
+  <defs>
+    <style>
+      .title { font: 700 28px Arial, sans-serif; fill: #102a43; }
+      .subtitle { font: 400 15px Arial, sans-serif; fill: #334e68; }
+      .h { font: 700 16px Arial, sans-serif; fill: #102a43; }
+      .t { font: 400 14px Arial, sans-serif; fill: #243b53; }
+      .small { font: 400 12px Arial, sans-serif; fill: #486581; }
+      .box { rx: 12; ry: 12; stroke: #829ab1; stroke-width: 1.5; }
+      .arrow { stroke: #334e68; stroke-width: 2; fill: none; marker-end: url(#arr); }
+    </style>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334e68" />
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1400" height="980" fill="#f7fafc"/>
+  <text x="40" y="52" class="title">HikSADP for Linux - Flow Diagram</text>
+  <text x="40" y="78" class="subtitle">Discovery, Device Management, Recovery, and UI Interaction</text>
+
+  <!-- UI Layer -->
+  <rect class="box" x="40" y="120" width="1320" height="220" fill="#e6fffa"/>
+  <text x="60" y="150" class="h">UI Layer (Qt Widgets)</text>
+
+  <rect class="box" x="70" y="175" width="250" height="140" fill="#ffffff"/>
+  <text x="85" y="200" class="h">Device Table</text>
+  <text x="85" y="225" class="t">- Scan result list</text>
+  <text x="85" y="245" class="t">- Search / Filter</text>
+  <text x="85" y="265" class="t">- Preserve selection</text>
+
+  <rect class="box" x="350" y="175" width="280" height="140" fill="#ffffff"/>
+  <text x="365" y="200" class="h">Action Toolbar</text>
+  <text x="365" y="225" class="t">Activate / Network / Reboot</text>
+  <text x="365" y="245" class="t">Change Password / Reset</text>
+  <text x="365" y="265" class="t">Open Web / Export</text>
+
+  <rect class="box" x="660" y="175" width="300" height="140" fill="#ffffff"/>
+  <text x="675" y="200" class="h">Detail Panel</text>
+  <text x="675" y="225" class="t">- Identity + Network info</text>
+  <text x="675" y="245" class="t">- Recovery capability status</text>
+  <text x="675" y="265" class="t">- Toggle show/hide</text>
+
+  <rect class="box" x="990" y="175" width="340" height="140" fill="#ffffff"/>
+  <text x="1005" y="200" class="h">Recovery Method Selector</text>
+  <text x="1005" y="225" class="t">1) XML export request</text>
+  <text x="1005" y="245" class="t">2) XML import response/apply</text>
+  <text x="1005" y="265" class="t">3) Security questions handoff</text>
+
+  <!-- Management Layer -->
+  <rect class="box" x="40" y="380" width="1320" height="190" fill="#fffbea"/>
+  <text x="60" y="410" class="h">Management Layer</text>
+
+  <rect class="box" x="80" y="435" width="430" height="110" fill="#ffffff"/>
+  <text x="95" y="460" class="h">DeviceManager</text>
+  <text x="95" y="485" class="t">- Orchestrate operations</text>
+  <text x="95" y="505" class="t">- Stale after 30s, purge after 90s</text>
+  <text x="95" y="525" class="t">- Batch progress callback</text>
+
+  <rect class="box" x="540" y="435" width="360" height="110" fill="#ffffff"/>
+  <text x="555" y="460" class="h">ISAPI Client</text>
+  <text x="555" y="485" class="t">- Activate / Network / Reboot</text>
+  <text x="555" y="505" class="t">- Change password + endpoint fallback</text>
+
+  <rect class="box" x="930" y="435" width="390" height="110" fill="#ffffff"/>
+  <text x="945" y="460" class="h">PasswordResetService</text>
+  <text x="945" y="485" class="t">- Build request XML</text>
+  <text x="945" y="505" class="t">- Parse response XML + apply code</text>
+
+  <!-- Protocol Layer -->
+  <rect class="box" x="40" y="610" width="1320" height="170" fill="#eef2ff"/>
+  <text x="60" y="640" class="h">Protocol Layer</text>
+
+  <rect class="box" x="80" y="665" width="580" height="90" fill="#ffffff"/>
+  <text x="95" y="690" class="h">SADP Discovery</text>
+  <text x="95" y="715" class="t">- UDP broadcast + multicast probe</text>
+  <text x="95" y="735" class="t">- Parse ProbeMatch / binary replies</text>
+
+  <rect class="box" x="700" y="665" width="620" height="90" fill="#ffffff"/>
+  <text x="715" y="690" class="h">SADP Packet + Parser</text>
+  <text x="715" y="715" class="t">- Build packets, checksum, validation</text>
+  <text x="715" y="735" class="t">- Extract identity, network, reset capability</text>
+
+  <!-- External -->
+  <rect class="box" x="40" y="820" width="1320" height="120" fill="#ffe3e3"/>
+  <text x="60" y="850" class="h">External Systems</text>
+
+  <rect class="box" x="90" y="870" width="390" height="50" fill="#ffffff"/>
+  <text x="105" y="901" class="t">Hikvision Devices (Camera/NVR/DVR)</text>
+
+  <rect class="box" x="520" y="870" width="360" height="50" fill="#ffffff"/>
+  <text x="535" y="901" class="t">Device Web UI (security questions flow)</text>
+
+  <rect class="box" x="920" y="870" width="390" height="50" fill="#ffffff"/>
+  <text x="935" y="901" class="t">Local Files (CSV/XML export/import)</text>
+
+  <!-- Arrows -->
+  <path class="arrow" d="M700 340 L700 435"/>
+  <path class="arrow" d="M700 545 L700 665"/>
+  <path class="arrow" d="M700 755 L700 870"/>
+
+  <path class="arrow" d="M320 245 L540 490"/>
+  <path class="arrow" d="M630 245 L950 490"/>
+  <path class="arrow" d="M510 490 L660 710"/>
+  <path class="arrow" d="M870 490 L1000 710"/>
+
+  <text x="40" y="965" class="small">Note: Cross-subnet web/device access still requires valid routing/VPN/NAT in network path.</text>
+</svg>
