@@ -5,6 +5,7 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QFileDialog>
+#include <QInputDialog>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
@@ -147,7 +148,60 @@ void MainWindow::on_scan_clicked()
 
 void MainWindow::on_activate_clicked()
 {
-    show_info("Not Implemented", "Activation dialog akan diimplementasikan di M2.");
+    const auto macs = selected_macs();
+    if (macs.empty()) {
+        show_info("Activate", "Pilih minimal satu device terlebih dulu.");
+        return;
+    }
+
+    bool ok = false;
+    const auto password = QInputDialog::getText(
+        this,
+        "Activate Device",
+        QString("Masukkan password admin untuk %1 device:")
+            .arg(macs.size()),
+        QLineEdit::Password,
+        {},
+        &ok);
+
+    if (!ok || password.isEmpty()) {
+        return;
+    }
+
+    const auto password_std = password.toStdString();
+    if (!is_strong_password(password_std)) {
+        show_error("Activate Error",
+                   "Password lemah. Gunakan minimal 8 karakter dan kombinasi >=3 kategori (huruf besar/kecil/angka/simbol).");
+        return;
+    }
+
+    const auto result = impl_->device_manager.activate_batch(
+        macs, Password{password_std});
+
+    const auto success = result.success_count();
+    const auto failed = result.failure_count();
+
+    QString message = QString("Activation selesai.\nBerhasil: %1\nGagal: %2")
+        .arg(success)
+        .arg(failed);
+
+    if (failed > 0) {
+        QStringList lines;
+        for (const auto& item : result.items) {
+            if (!item.success) {
+                lines << QString("- %1: %2")
+                             .arg(QString::fromStdString(item.device_label))
+                             .arg(QString::fromStdString(item.error_message));
+            }
+        }
+        message += "\n\nDetail gagal:\n" + lines.join('\n');
+        show_error("Activation Result", message);
+    } else {
+        show_info("Activation Result", message);
+    }
+
+    impl_->lbl_status->setText(
+        QString("Activation done: %1 success, %2 failed").arg(success).arg(failed));
 }
 
 void MainWindow::on_network_config_clicked()
