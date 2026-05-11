@@ -70,6 +70,8 @@ struct Device {
     FirmwareVersion firmware_version;
     std::string     model;           // mis. "DS-2CD2143G2-I"
     std::string     device_type;     // mis. "IPCamera", "NVR", "DVR"
+    std::string     password_reset_mode; // dari SADP tag PasswordResetModeSecond
+    std::string     support_reset;       // dari SADP tag Support
 
     // Network
     NetworkConfig   network;

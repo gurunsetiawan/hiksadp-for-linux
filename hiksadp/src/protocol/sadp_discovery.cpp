@@ -82,6 +82,10 @@ namespace {
             device.model = text.toStdString();
         } else if (name == QStringLiteral("DeviceType")) {
             device.device_type = text.toStdString();
+        } else if (name == QStringLiteral("PasswordResetModeSecond")) {
+            device.password_reset_mode = text.toStdString();
+        } else if (name == QStringLiteral("Support")) {
+            device.support_reset = text.toStdString();
         } else if (name == QStringLiteral("IPv4Address")) {
             device.network.ip = IpAddress{text.toStdString()};
             has_ip = !text.isEmpty();

@@ -716,6 +716,17 @@ void MainWindow::on_password_reset_clicked()
         return;
     }
 
+    const auto mode_lc = QString::fromStdString(dev->password_reset_mode).toLower();
+    const bool supports_security_questions =
+        mode_lc.contains("question") || mode_lc.contains("qa") || mode_lc.contains("security");
+    if (supports_security_questions) {
+        show_info(
+            "Password Reset Mode",
+            "Device melaporkan mode reset berbasis security questions tersedia.\n"
+            "Saat ini aplikasi ini baru otomatis untuk flow XML/security-code.\n"
+            "Flow question-answer masih perlu implement endpoint per firmware/model.");
+    }
+
     if (action == QMessageBox::Yes) {
         const auto path = QFileDialog::getSaveFileName(
             this, "Save Reset Request XML", "reset_request.xml", "XML Files (*.xml)");
