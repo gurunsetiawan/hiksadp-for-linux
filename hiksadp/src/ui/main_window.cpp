@@ -11,6 +11,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QComboBox>
 #include <QCheckBox>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -29,6 +30,8 @@ struct MainWindow::Impl {
     QPushButton* btn_reboot{nullptr};
     QPushButton* btn_export_csv{nullptr};
     QPushButton* btn_export_xml{nullptr};
+    QLineEdit* search_edit{nullptr};
+    QComboBox* status_filter{nullptr};
 
     QLabel* lbl_status{nullptr};
 
@@ -74,11 +77,19 @@ void MainWindow::setup_toolbar()
     impl_->btn_reboot = new QPushButton("Reboot", this);
     impl_->btn_export_csv = new QPushButton("Export CSV", this);
     impl_->btn_export_xml = new QPushButton("Export XML", this);
+    impl_->search_edit = new QLineEdit(this);
+    impl_->status_filter = new QComboBox(this);
+    impl_->search_edit->setPlaceholderText("Search IP / Serial / Model...");
+    impl_->search_edit->setMinimumWidth(240);
+    impl_->status_filter->addItems({"All", "Active", "Inactive"});
 
     toolbar->addWidget(impl_->btn_scan);
     toolbar->addWidget(impl_->btn_activate);
     toolbar->addWidget(impl_->btn_network);
     toolbar->addWidget(impl_->btn_reboot);
+    toolbar->addSeparator();
+    toolbar->addWidget(impl_->search_edit);
+    toolbar->addWidget(impl_->status_filter);
     toolbar->addSeparator();
     toolbar->addWidget(impl_->btn_export_csv);
     toolbar->addWidget(impl_->btn_export_xml);
@@ -107,6 +118,10 @@ void MainWindow::setup_connections()
 
     connect(impl_->table, &DeviceTableWidget::selection_changed,
             this, &MainWindow::on_selection_changed);
+    connect(impl_->search_edit, &QLineEdit::textChanged,
+            impl_->table, &DeviceTableWidget::set_filter_text);
+    connect(impl_->status_filter, &QComboBox::currentTextChanged,
+            impl_->table, &DeviceTableWidget::set_filter_status);
 
     impl_->device_manager.on_device_list_changed([this](const std::vector<Device>& devices) {
         impl_->table->set_devices(devices);
@@ -317,7 +332,63 @@ void MainWindow::on_network_config_clicked()
 
 void MainWindow::on_reboot_clicked()
 {
-    show_info("Not Implemented", "Reboot operation UI akan diimplementasikan di M2.");
+    const auto macs = selected_macs();
+    if (macs.empty()) {
+        show_info("Reboot", "Pilih minimal satu device terlebih dulu.");
+        return;
+    }
+
+    bool ok = false;
+    const auto password = QInputDialog::getText(
+        this,
+        "Reboot Device",
+        QString("Masukkan password admin untuk reboot %1 device:")
+            .arg(macs.size()),
+        QLineEdit::Password,
+        {},
+        &ok);
+
+    if (!ok || password.isEmpty()) {
+        return;
+    }
+
+    const auto confirm = QMessageBox::question(
+        this,
+        "Confirm Reboot",
+        QString("Yakin reboot %1 device terpilih?").arg(macs.size()),
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No);
+    if (confirm != QMessageBox::Yes) {
+        return;
+    }
+
+    const auto result = impl_->device_manager.reboot_batch(
+        macs, Password{password.toStdString()});
+
+    const auto success = result.success_count();
+    const auto failed = result.failure_count();
+
+    QString message = QString("Reboot selesai.\nBerhasil: %1\nGagal: %2")
+        .arg(success)
+        .arg(failed);
+
+    if (failed > 0) {
+        QStringList lines;
+        for (const auto& item : result.items) {
+            if (!item.success) {
+                lines << QString("- %1: %2")
+                             .arg(QString::fromStdString(item.device_label))
+                             .arg(QString::fromStdString(item.error_message));
+            }
+        }
+        message += "\n\nDetail gagal:\n" + lines.join('\n');
+        show_error("Reboot Result", message);
+    } else {
+        show_info("Reboot Result", message);
+    }
+
+    impl_->lbl_status->setText(
+        QString("Reboot done: %1 success, %2 failed").arg(success).arg(failed));
 }
 
 void MainWindow::on_export_csv_clicked()
