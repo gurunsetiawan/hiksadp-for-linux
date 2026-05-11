@@ -22,6 +22,8 @@
 #include <QTextStream>
 #include <QToolBar>
 #include <QDateTime>
+#include <QDesktopServices>
+#include <QUrl>
 
 namespace hiksadp::ui {
 
@@ -33,6 +35,7 @@ struct MainWindow::Impl {
     QPushButton* btn_network{nullptr};
     QPushButton* btn_reboot{nullptr};
     QPushButton* btn_change_password{nullptr};
+    QPushButton* btn_open_web{nullptr};
     QPushButton* btn_password_reset{nullptr};
     QPushButton* btn_export_csv{nullptr};
     QPushButton* btn_export_xml{nullptr};
@@ -61,6 +64,8 @@ static std::vector<std::pair<QString, QString>> export_columns()
         {"Model", "model"},
         {"Device Type", "type"},
         {"Firmware", "firmware"},
+        {"Reset Mode", "reset_mode"},
+        {"Reset Support", "reset_support"},
         {"DHCP", "dhcp"},
         {"Status", "status"},
     };
@@ -126,6 +131,8 @@ static QString device_field_value(const Device& dev, const QString& key)
     if (key == "model") return QString::fromStdString(dev.model);
     if (key == "type") return QString::fromStdString(dev.device_type);
     if (key == "firmware") return QString::fromStdString(dev.firmware_version.get());
+    if (key == "reset_mode") return QString::fromStdString(dev.password_reset_mode);
+    if (key == "reset_support") return QString::fromStdString(dev.support_reset);
     if (key == "dhcp") return dev.network.dhcp_enabled ? "Yes" : "No";
     if (key == "status") return QString::fromStdString(dev.status_string());
     return {};
@@ -168,6 +175,7 @@ void MainWindow::setup_toolbar()
     impl_->btn_network = new QPushButton("Network", this);
     impl_->btn_reboot = new QPushButton("Reboot", this);
     impl_->btn_change_password = new QPushButton("Change Password", this);
+    impl_->btn_open_web = new QPushButton("Open Web", this);
     impl_->btn_password_reset = new QPushButton("Password Reset", this);
     impl_->btn_export_csv = new QPushButton("Export CSV", this);
     impl_->btn_export_xml = new QPushButton("Export XML", this);
@@ -183,6 +191,7 @@ void MainWindow::setup_toolbar()
     toolbar->addWidget(impl_->btn_network);
     toolbar->addWidget(impl_->btn_reboot);
     toolbar->addWidget(impl_->btn_change_password);
+    toolbar->addWidget(impl_->btn_open_web);
     toolbar->addWidget(impl_->btn_password_reset);
     toolbar->addSeparator();
     toolbar->addWidget(impl_->search_edit);
@@ -218,6 +227,8 @@ void MainWindow::setup_connections()
             this, &MainWindow::on_reboot_clicked);
     connect(impl_->btn_change_password, &QPushButton::clicked,
             this, &MainWindow::on_change_password_clicked);
+    connect(impl_->btn_open_web, &QPushButton::clicked,
+            this, &MainWindow::on_open_web_clicked);
     connect(impl_->btn_password_reset, &QPushButton::clicked,
             this, &MainWindow::on_password_reset_clicked);
     connect(impl_->btn_export_csv, &QPushButton::clicked,
@@ -275,6 +286,7 @@ void MainWindow::update_action_states()
     impl_->btn_network->setEnabled(has_selection);
     impl_->btn_reboot->setEnabled(has_selection);
     impl_->btn_change_password->setEnabled(count == 1);
+    impl_->btn_open_web->setEnabled(count == 1);
     impl_->btn_password_reset->setEnabled(count == 1);
 }
 
@@ -691,6 +703,30 @@ void MainWindow::on_change_password_clicked()
     impl_->lbl_status->setText("Password changed");
 }
 
+void MainWindow::on_open_web_clicked()
+{
+    const auto macs = selected_macs();
+    if (macs.size() != 1) {
+        show_info("Open Web", "Pilih tepat satu device.");
+        return;
+    }
+    auto dev = impl_->device_manager.find_by_mac(macs.front());
+    if (!dev) {
+        show_error("Open Web Error", "Device tidak ditemukan.");
+        return;
+    }
+
+    const auto url = QString("http://%1:%2")
+                         .arg(QString::fromStdString(dev->network.ip.get()))
+                         .arg(dev->network.http_port.get());
+    const bool ok = QDesktopServices::openUrl(QUrl(url));
+    if (!ok) {
+        show_error("Open Web Error", "Gagal membuka browser.");
+        return;
+    }
+    impl_->lbl_status->setText("Opened web login");
+}
+
 void MainWindow::on_password_reset_clicked()
 {
     const auto macs = selected_macs();
@@ -739,6 +775,16 @@ void MainWindow::on_password_reset_clicked()
     if (!ok || chosen.isEmpty()) return;
 
     if (chosen == "Security Questions (device-side)") {
+        const auto open_now = QMessageBox::question(
+            this,
+            "Security Questions",
+            "Flow security questions dilakukan di web/local GUI device.\n"
+            "Buka web login device sekarang?",
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::Yes);
+        if (open_now == QMessageBox::Yes) {
+            on_open_web_clicked();
+        }
         if (supports_security_questions) {
             show_info(
                 "Security Questions",

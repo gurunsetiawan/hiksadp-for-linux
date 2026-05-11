@@ -41,6 +41,7 @@ private Q_SLOTS:
     void on_network_config_clicked();
     void on_reboot_clicked();
     void on_change_password_clicked();
+    void on_open_web_clicked();
     void on_password_reset_clicked();
     void on_export_csv_clicked();
     void on_export_xml_clicked();
