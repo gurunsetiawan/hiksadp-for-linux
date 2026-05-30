@@ -7,6 +7,9 @@ project(
   LANGUAGES CXX
 )
 
+include(CTest)
+enable_testing()
+
 # ── C++23 standard, mandatory ──────────────────────────────────────────────
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

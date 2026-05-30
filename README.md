@@ -45,11 +45,13 @@ Prasyarat utama:
 - Compiler C++23 (GCC/Clang)
 - Qt6 (Core, Network, Widgets)
 - Catch2 v3 (opsional, untuk test target)
+  - Jika tidak tersedia, project tetap build `hiksadp_smoke_tests` (tanpa dependency eksternal).
 
 ```bash
 cd hiksadp
 cmake -S . -B build
 cmake --build build -j
+ctest --test-dir build --output-on-failure
 ```
 
 Jalankan GUI:

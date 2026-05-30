@@ -63,6 +63,7 @@ Teknisi Linux membutuhkan tool native untuk discovery dan konfigurasi perangkat 
 
 ## 6. Non-Functional Requirements
 - Build di Linux dengan CMake + Qt6 + C++23.
+- Test harus tetap runnable di environment tanpa Catch2 v3 melalui smoke test executable (`hiksadp_smoke_tests`).
 - Type safety:
   - strong types
   - expected-style result/error.
