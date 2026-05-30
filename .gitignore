@@ -2,3 +2,6 @@
 HikSADP_Linux_PRD_v1.0.docx
 hiksadp_phase1.zip
 hikvision_sadp_linux_project_plan.svg
+
+# Build artifacts
+hiksadp/build/

@@ -3,6 +3,8 @@ add_library(hiksadp_core STATIC
   core/types.hpp          # strong typedefs & domain primitives
   core/result.hpp         # Result<T,E> alias atas std::expected
   core/device.hpp         # Device struct & DeviceState variant
+  core/csv.hpp
+  core/csv.cpp
   core/logger.hpp
   core/logger.cpp
   core/device.cpp

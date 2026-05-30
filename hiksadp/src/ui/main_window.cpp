@@ -1,6 +1,7 @@
 #include "ui/main_window.hpp"
 
 #include "core/logger.hpp"
+#include "core/csv.hpp"
 #include "management/password_reset_service.hpp"
 #include "ui/device_table.hpp"
 
@@ -188,6 +189,11 @@ static QString escape_xml(QString s)
     s.replace("\"", "&quot;");
     s.replace("'", "&apos;");
     return s;
+}
+
+static QString escape_csv_field_qt(const QString& in)
+{
+    return QString::fromStdString(escape_csv_field(in.toStdString()));
 }
 
 static std::optional<std::vector<QString>>
@@ -1144,14 +1150,20 @@ void MainWindow::on_export_csv_clicked()
     }
 
     QTextStream out(&file);
-    out << headers.join(',') << "\n";
+    for (int i = 0; i < headers.size(); ++i) {
+        if (i > 0) out << ",";
+        out << escape_csv_field_qt(headers[i]);
+    }
+    out << "\n";
     const auto devices = impl_->device_manager.devices();
     for (const auto& dev : devices) {
-        QStringList row;
+        bool first = true;
         for (const auto& key : cols) {
-            row << device_field_value(dev, key);
+            if (!first) out << ",";
+            out << escape_csv_field_qt(device_field_value(dev, key));
+            first = false;
         }
-        out << row.join(',') << "\n";
+        out << "\n";
     }
 
     impl_->lbl_status->setText("CSV exported");
@@ -1226,13 +1238,11 @@ void MainWindow::on_selection_changed()
 void MainWindow::on_device_found(const hiksadp::Device& device)
 {
     impl_->table->upsert_device(device);
-
-    auto all = impl_->table->all_devices();
-    impl_->device_manager.update_devices(all);
 }
 
 void MainWindow::on_scan_complete(const protocol::DiscoveryResult& result)
 {
+    impl_->device_manager.update_devices(result.devices);
     impl_->btn_scan->setEnabled(true);
     impl_->lbl_status->setText(QString("Scan complete: %1 device(s)").arg(result.responses_received));
     Logger::write(

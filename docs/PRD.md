@@ -54,9 +54,12 @@ Teknisi Linux membutuhkan tool native untuk discovery dan konfigurasi perangkat 
 - Panel detail kanan realtime.
 - Toggle show/hide detail panel.
 - Preserve selection saat auto refresh (berdasarkan MAC).
+- Scan Settings untuk konfigurasi retention TTL:
+  - stale after
+  - purge after.
 - Export CSV/XML.
 - Open web login device.
-- Logging operasional ke file `logs/hiksadp.log` untuk aksi penting dan error.
+- Logging operasional ke file aplikasi (`QStandardPaths::AppDataLocation/hiksadp.log`) untuk aksi penting dan error.
 
 ## 6. Non-Functional Requirements
 - Build di Linux dengan CMake + Qt6 + C++23.

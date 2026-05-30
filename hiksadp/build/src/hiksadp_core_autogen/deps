@@ -1,7 +1,0 @@
-hiksadp_core_autogen/timestamp: \
-	/home/iwan/Project/hik-device-discovery/hiksadp/src/CMakeLists.txt \
-	/home/iwan/Project/hik-device-discovery/hiksadp/src/core/device.cpp \
-	/home/iwan/Project/hik-device-discovery/hiksadp/src/core/device.hpp \
-	/home/iwan/Project/hik-device-discovery/hiksadp/src/core/result.hpp \
-	/home/iwan/Project/hik-device-discovery/hiksadp/src/core/types.hpp \
-	/usr/bin/cmake

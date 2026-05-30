@@ -11,6 +11,10 @@ HikSADP for Linux adalah aplikasi desktop Linux untuk discovery dan manajemen da
 ## Fitur Utama
 - SADP discovery (multicast + broadcast) dengan auto refresh.
 - Device list, search/filter, dan panel detail device.
+- Preserve selection saat auto refresh (berdasarkan MAC).
+- Scan Settings untuk atur retention TTL:
+  - stale after
+  - purge after.
 - Activate device (batch).
 - Network config:
   - single device
@@ -40,6 +44,7 @@ Prasyarat utama:
 - CMake >= 3.22
 - Compiler C++23 (GCC/Clang)
 - Qt6 (Core, Network, Widgets)
+- Catch2 v3 (opsional, untuk test target)
 
 ```bash
 cd hiksadp
@@ -59,10 +64,12 @@ Jalankan CLI:
 
 ## Catatan Operasional
 - Discovery bisa intermiten di jaringan ramai; aplikasi sudah memakai mekanisme stale/purge agar daftar device lebih stabil saat auto refresh.
+- Mekanisme update daftar device memakai hasil scan terbaru per siklus (`scan_complete`) agar stale/purge bekerja konsisten.
 - Akses web device lintas subnet membutuhkan routing/VPN/NAT yang benar. Mengganti browser eksternal ke embedded webview tidak menghilangkan kebutuhan route jaringan.
+- Logging operasional disimpan ke:
+  - GUI/CLI: `QStandardPaths::AppDataLocation/hiksadp.log`.
 
 ## Roadmap Berikutnya
-- Konfigurasi `stale/purge TTL` dari UI.
 - Security Questions flow end-to-end (per firmware/model matrix).
 - Embedded webview opsional (UI convenience, bukan bypass routing).
 

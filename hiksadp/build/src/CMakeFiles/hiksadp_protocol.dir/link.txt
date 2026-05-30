@@ -1,2 +1,0 @@
-/usr/bin/ar qc libhiksadp_protocol.a CMakeFiles/hiksadp_protocol.dir/hiksadp_protocol_autogen/mocs_compilation.cpp.o CMakeFiles/hiksadp_protocol.dir/protocol/sadp_packet.cpp.o CMakeFiles/hiksadp_protocol.dir/protocol/sadp_discovery.cpp.o
-/usr/bin/ranlib libhiksadp_protocol.a

@@ -1,2 +1,0 @@
-/usr/bin/ar qc libhiksadp_ui.a CMakeFiles/hiksadp_ui.dir/hiksadp_ui_autogen/mocs_compilation.cpp.o CMakeFiles/hiksadp_ui.dir/ui/device_table.cpp.o
-/usr/bin/ranlib libhiksadp_ui.a

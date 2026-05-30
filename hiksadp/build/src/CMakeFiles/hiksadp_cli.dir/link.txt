@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/hiksadp_cli.dir/hiksadp_cli_autogen/mocs_compilation.cpp.o CMakeFiles/hiksadp_cli.dir/main_cli.cpp.o -o hiksadp_cli  libhiksadp_protocol.a /usr/lib/x86_64-linux-gnu/libQt6Network.so.6.4.2 /usr/lib/x86_64-linux-gnu/libQt6Core.so.6.4.2 libhiksadp_core.a 

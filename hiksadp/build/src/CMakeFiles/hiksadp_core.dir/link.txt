@@ -1,2 +1,0 @@
-/usr/bin/ar qc libhiksadp_core.a CMakeFiles/hiksadp_core.dir/hiksadp_core_autogen/mocs_compilation.cpp.o CMakeFiles/hiksadp_core.dir/core/device.cpp.o
-/usr/bin/ranlib libhiksadp_core.a

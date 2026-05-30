@@ -7,6 +7,7 @@ endif()
 add_executable(hiksadp_tests
   test_types.cpp
   test_packet.cpp
+  test_csv.cpp
 )
 
 target_link_libraries(hiksadp_tests

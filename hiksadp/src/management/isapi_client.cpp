@@ -64,7 +64,21 @@ struct IsapiClient::Impl {
 
         if (reply->error() != QNetworkReply::NoError) {
             const auto err_str = reply->errorString().toStdString();
+            const auto http_status = reply->attribute(
+                QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const auto body = reply->readAll().toStdString();
             reply->deleteLater();
+
+            if (http_status == 401) {
+                return make_error<IsapiResponse>(ErrorCode::AuthenticationFailed,
+                                                  "HTTP 401");
+            }
+            if (http_status > 0) {
+                IsapiResponse resp;
+                resp.status_code = http_status;
+                resp.body = body;
+                return make_ok(std::move(resp));
+            }
 
             if (reply->error() == QNetworkReply::ConnectionRefusedError ||
                 reply->error() == QNetworkReply::HostNotFoundError) {
