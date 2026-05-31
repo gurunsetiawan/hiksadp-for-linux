@@ -1,0 +1,90 @@
+name: Auto Release Tag
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  create-tag:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main with tags
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Resolve version bump
+        id: bump
+        env:
+          LABELS_JSON: ${{ toJson(github.event.pull_request.labels) }}
+        shell: bash
+        run: |
+          BUMP="patch"
+          if echo "${LABELS_JSON}" | grep -q '"name":"release:major"'; then
+            BUMP="major"
+          elif echo "${LABELS_JSON}" | grep -q '"name":"release:minor"'; then
+            BUMP="minor"
+          elif echo "${LABELS_JSON}" | grep -q '"name":"release:patch"'; then
+            BUMP="patch"
+          fi
+
+          echo "bump=${BUMP}" >> "${GITHUB_OUTPUT}"
+
+      - name: Compute next tag
+        id: version
+        shell: bash
+        run: |
+          LATEST_TAG="$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1)"
+          if [[ -z "${LATEST_TAG}" ]]; then
+            LATEST_TAG="v0.0.0"
+          fi
+
+          VERSION="${LATEST_TAG#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${VERSION}"
+          MAJOR="${MAJOR:-0}"
+          MINOR="${MINOR:-0}"
+          PATCH="${PATCH:-0}"
+
+          case "${{ steps.bump.outputs.bump }}" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          NEXT_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "latest=${LATEST_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "next=${NEXT_TAG}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create and push tag
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git rev-parse "${{ steps.version.outputs.next }}" >/dev/null 2>&1; then
+            echo "Tag ${{ steps.version.outputs.next }} already exists; nothing to do."
+            exit 0
+          fi
+
+          git tag -a "${{ steps.version.outputs.next }}" \
+            -m "Release ${{ steps.version.outputs.next }} from PR #${{ github.event.pull_request.number }}"
+          git push origin "${{ steps.version.outputs.next }}"

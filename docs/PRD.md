@@ -65,6 +65,13 @@ Teknisi Linux membutuhkan tool native untuk discovery dan konfigurasi perangkat 
 - Open web login device.
 - Logging operasional ke file aplikasi (`QStandardPaths::AppDataLocation/hiksadp.log`) untuk aksi penting dan error.
 
+### 5.5 Release Automation
+- PR merge ke `main` membuat tag release otomatis.
+- Default version bump adalah patch.
+- Label PR `release:major`, `release:minor`, atau `release:patch` mengontrol bump versi.
+- Tag `v*` memicu workflow release untuk build, test, package, dan publish GitHub Release.
+- Workflow release tetap bisa dijalankan manual untuk recovery/maintenance release.
+
 ## 6. Non-Functional Requirements
 - Build di Linux dengan CMake + Qt6 + C++23.
 - Test harus tetap runnable di environment tanpa Catch2 v3 melalui smoke test executable (`hiksadp_smoke_tests`).

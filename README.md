@@ -71,14 +71,16 @@ Jalankan CLI:
 ```
 
 ## Release
-Release GitHub dibuat otomatis saat push tag `v*`:
+Release normal berjalan otomatis setelah PR merge ke `main`.
 
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
+Default bump adalah `patch`. Tambahkan label PR jika perlu:
+- `release:major`: naikkan versi mayor, contoh `v1.4.2` -> `v2.0.0`.
+- `release:minor`: naikkan versi minor, contoh `v1.4.2` -> `v1.5.0`.
+- `release:patch`: naikkan versi patch, contoh `v1.4.2` -> `v1.4.3`.
 
-Workflow release juga bisa dijalankan manual dari GitHub Actions dengan input tag dan catatan tambahan.
+Saat tag `v*` dibuat otomatis, workflow release akan build, test, package, lalu membuat GitHub Release dengan artefak `.deb` dan `.tar.gz`.
+
+Workflow release juga bisa dijalankan manual dari GitHub Actions dengan input tag dan catatan tambahan. Push tag manual `v*` tetap didukung.
 
 ## Catatan Operasional
 - Discovery bisa intermiten di jaringan ramai; aplikasi sudah memakai mekanisme stale/purge agar daftar device lebih stabil saat auto refresh.
