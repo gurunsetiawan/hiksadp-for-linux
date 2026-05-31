@@ -44,6 +44,13 @@ hiksadp::Device make_device(const std::string& mac, const std::string& ip)
     };
     return d;
 }
+
+hiksadp::Device make_device_with_model(const std::string& mac, const std::string& ip, const std::string& model)
+{
+    auto d = make_device(mac, ip);
+    d.model = model;
+    return d;
+}
 } // namespace
 
 int main()
@@ -77,6 +84,20 @@ int main()
     mgr.update_devices({});
     auto purged = mgr.find_by_mac(MacAddress{"AA:BB:CC:DD:EE:FF"});
     check(!purged.has_value(), "device purged after purge ttl");
+
+    DeviceManager export_mgr;
+    auto weird = make_device_with_model("11:22:33:44:55:66", "10.0.0.9", "Cam,\"Lab\"");
+    export_mgr.update_devices({weird});
+
+    auto csv = export_mgr.export_csv();
+    check(csv.has_value(), "export csv ok");
+    if (csv.has_value()) {
+        const auto escaped_pos = csv->find("\"Cam,\"\"Lab\"\"\"");
+        if (escaped_pos == std::string::npos) {
+            std::cerr << "CSV output:\n" << *csv << "\n";
+        }
+        check(escaped_pos != std::string::npos, "export csv escapes quote+comma field");
+    }
 
     if (g_failed > 0) {
         std::cerr << "Smoke tests failed: " << g_failed << "\n";

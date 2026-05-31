@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            g++ \
+            ninja-build \
+            qt6-base-dev
+
+      - name: Configure
+        run: cmake -S hiksadp -B hiksadp/build -G Ninja
+
+      - name: Build
+        run: cmake --build hiksadp/build
+
+      - name: Test
+        run: ctest --test-dir hiksadp/build --output-on-failure

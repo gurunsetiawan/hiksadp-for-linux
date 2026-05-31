@@ -92,5 +92,5 @@ Teknisi Linux membutuhkan tool native untuk discovery dan konfigurasi perangkat 
 - Security Questions full flow per firmware matrix.
 - Advanced mode: optional single-interface scan selector (non-default).
 - Theme policy eksplisit + opsi override dark/light.
-- Packaging release (AppImage/.deb/.rpm) dan pipeline CI build.
+- Packaging release (AppImage/.deb/.rpm).
 - Peningkatan test depth sesuai matriks test decisions PRD v1.0.
