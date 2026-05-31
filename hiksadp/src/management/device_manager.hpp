@@ -134,6 +134,13 @@ public:
                               const std::string& reset_code,
                               const Password& new_password);
 
+    [[nodiscard]] Result<void>
+    apply_password_reset_questions(const MacAddress& mac,
+                                   const std::string& answer1,
+                                   const std::string& answer2,
+                                   const std::string& answer3,
+                                   const Password& new_password);
+
     // ── Export ────────────────────────────────────────────────────────────
 
     [[nodiscard]] Result<std::string> export_csv() const;

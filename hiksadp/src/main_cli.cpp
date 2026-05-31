@@ -4,6 +4,8 @@
 
 #include <QCoreApplication>
 #include <QTimer>
+#include <QDir>
+#include <QStandardPaths>
 
 #include <format>
 #include <iostream>
@@ -202,7 +204,9 @@ int main(int argc, char* argv[])
     QCoreApplication app(argc, argv);
     app.setApplicationName("HikSADP Linux");
     app.setApplicationVersion("1.0.0");
-    Logger::set_log_file("logs/hiksadp.log");
+    const auto log_dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir{}.mkpath(log_dir);
+    Logger::set_log_file((log_dir + "/hiksadp.log").toStdString());
     Logger::write(LogLevel::Info, "CLI started");
 
     auto parsed = parse_args(argc, argv);

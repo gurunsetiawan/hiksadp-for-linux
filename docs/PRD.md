@@ -44,6 +44,10 @@ Teknisi Linux membutuhkan tool native untuk discovery dan konfigurasi perangkat 
 - Security-code XML request export.
 - Security-code XML response import.
 - Apply security code ke device.
+- Security Questions in-app flow:
+  - input 3 jawaban
+  - set password baru
+  - submit ke endpoint fallback sesuai firmware.
 - Recovery method selector.
 - Capability display:
   - PasswordResetModeSecond
@@ -54,12 +58,16 @@ Teknisi Linux membutuhkan tool native untuk discovery dan konfigurasi perangkat 
 - Panel detail kanan realtime.
 - Toggle show/hide detail panel.
 - Preserve selection saat auto refresh (berdasarkan MAC).
+- Scan Settings untuk konfigurasi retention TTL:
+  - stale after
+  - purge after.
 - Export CSV/XML.
 - Open web login device.
-- Logging operasional ke file `logs/hiksadp.log` untuk aksi penting dan error.
+- Logging operasional ke file aplikasi (`QStandardPaths::AppDataLocation/hiksadp.log`) untuk aksi penting dan error.
 
 ## 6. Non-Functional Requirements
 - Build di Linux dengan CMake + Qt6 + C++23.
+- Test harus tetap runnable di environment tanpa Catch2 v3 melalui smoke test executable (`hiksadp_smoke_tests`).
 - Type safety:
   - strong types
   - expected-style result/error.
@@ -85,8 +93,8 @@ Teknisi Linux membutuhkan tool native untuk discovery dan konfigurasi perangkat 
 - Recovery XML flow dapat dipakai teknisi lapangan.
 
 ## 10. Open Items
-- Security Questions full flow per firmware matrix.
+- Security Questions hardening per firmware matrix (beberapa model butuh endpoint/payload khusus).
 - Advanced mode: optional single-interface scan selector (non-default).
 - Theme policy eksplisit + opsi override dark/light.
-- Packaging release (AppImage/.deb/.rpm) dan pipeline CI build.
+- Packaging release AppImage/.rpm (TGZ/.deb sudah tersedia).
 - Peningkatan test depth sesuai matriks test decisions PRD v1.0.

@@ -1,6 +1,8 @@
 #include "ui/main_window.hpp"
 
 #include "core/logger.hpp"
+#include "core/csv.hpp"
+#include "management/isapi_client.hpp"
 #include "management/password_reset_service.hpp"
 #include "ui/device_table.hpp"
 
@@ -13,7 +15,9 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QMetaObject>
 #include <QPushButton>
+#include <QPointer>
 #include <QComboBox>
 #include <QCheckBox>
 #include <QDialog>
@@ -31,6 +35,7 @@
 #include <QWidget>
 #include <chrono>
 #include <format>
+#include <thread>
 
 namespace hiksadp::ui {
 
@@ -188,6 +193,11 @@ static QString escape_xml(QString s)
     s.replace("\"", "&quot;");
     s.replace("'", "&apos;");
     return s;
+}
+
+static QString escape_csv_field_qt(const QString& in)
+{
+    return QString::fromStdString(escape_csv_field(in.toStdString()));
 }
 
 static std::optional<std::vector<QString>>
@@ -998,28 +1008,91 @@ void MainWindow::on_password_reset_clicked()
     if (!ok || chosen.isEmpty()) return;
 
     if (chosen == "Security Questions (device-side)") {
-        const auto open_now = QMessageBox::question(
+        if (!supports_security_questions) {
+            show_info(
+                "Security Questions",
+                "Mode security questions tidak terdeteksi dari respons SADP.\n"
+                "Tetap bisa mencoba flow ini, tetapi mungkin ditolak oleh firmware.");
+        }
+
+        bool q1_ok = false;
+        bool q2_ok = false;
+        bool q3_ok = false;
+        bool np_ok = false;
+
+        const auto a1 = QInputDialog::getText(
+            this, "Security Question 1", "Jawaban pertanyaan keamanan #1:",
+            QLineEdit::Normal, {}, &q1_ok);
+        if (!q1_ok) return;
+        const auto a2 = QInputDialog::getText(
+            this, "Security Question 2", "Jawaban pertanyaan keamanan #2:",
+            QLineEdit::Normal, {}, &q2_ok);
+        if (!q2_ok) return;
+        const auto a3 = QInputDialog::getText(
+            this, "Security Question 3", "Jawaban pertanyaan keamanan #3:",
+            QLineEdit::Normal, {}, &q3_ok);
+        if (!q3_ok) return;
+        const auto new_password = QInputDialog::getText(
+            this, "New Admin Password", "Password admin baru:",
+            QLineEdit::Password, {}, &np_ok);
+        if (!np_ok || new_password.isEmpty()) return;
+
+        const auto confirm = QMessageBox::question(
             this,
-            "Security Questions",
-            "Flow security questions dilakukan di web/local GUI device.\n"
-            "Buka web login device sekarang?",
+            "Confirm Security Questions Reset",
+            "Apply reset password via security questions sekarang?",
             QMessageBox::Yes | QMessageBox::No,
-            QMessageBox::Yes);
-        if (open_now == QMessageBox::Yes) {
-            on_open_web_clicked();
+            QMessageBox::No);
+        if (confirm != QMessageBox::Yes) return;
+
+        const auto target = impl_->device_manager.find_by_mac(macs.front());
+        if (!target) {
+            show_error("Security Questions Reset Failed", "Device tidak ditemukan.");
+            return;
         }
-        if (supports_security_questions) {
-            show_info(
-                "Security Questions",
-                "Device terdeteksi mendukung security questions.\n"
-                "Untuk saat ini, jalankan flow ini dari UI web/local GUI resmi device.\n"
-                "Integrasi question-answer langsung dari aplikasi ini belum diimplementasikan.");
-        } else {
-            show_info(
-                "Security Questions",
-                "Dari respons SADP, mode security questions tidak terdeteksi pada device ini.\n"
-                "Coba metode XML/security code atau change password (jika masih tahu password lama).");
-        }
+
+        const auto answer1 = a1.trimmed().toStdString();
+        const auto answer2 = a2.trimmed().toStdString();
+        const auto answer3 = a3.trimmed().toStdString();
+        const auto password = Password{new_password.toStdString()};
+        const SecurityQuestionResetRequest req{
+            .ip = target->network.ip,
+            .http_port = target->network.http_port,
+            .answer1 = answer1,
+            .answer2 = answer2,
+            .answer3 = answer3,
+            .new_password = password,
+        };
+
+        impl_->btn_password_reset->setEnabled(false);
+        impl_->lbl_status->setText("Security questions reset running...");
+
+        const QPointer<MainWindow> self{this};
+        std::thread{[self, req] {
+            // QNetworkAccessManager is thread-affine, so each worker owns its client.
+            IsapiClient client;
+            auto result = client.reset_password_by_security_questions(req);
+
+            if (!self) return;
+            QMetaObject::invokeMethod(
+                self.data(),
+                [self, result = std::move(result)]() mutable {
+                    if (!self) return;
+                    self->update_action_states();
+                    if (!result) {
+                        self->show_error(
+                            "Security Questions Reset Failed",
+                            QString::fromStdString(result.error().message()));
+                        self->impl_->lbl_status->setText("Security questions reset failed");
+                        return;
+                    }
+                    self->show_info(
+                        "Security Questions Reset",
+                        "Password reset berhasil via security questions.");
+                    self->impl_->lbl_status->setText("Security questions reset success");
+                },
+                Qt::QueuedConnection);
+        }}.detach();
         return;
     }
 
@@ -1144,14 +1217,20 @@ void MainWindow::on_export_csv_clicked()
     }
 
     QTextStream out(&file);
-    out << headers.join(',') << "\n";
+    for (int i = 0; i < headers.size(); ++i) {
+        if (i > 0) out << ",";
+        out << escape_csv_field_qt(headers[i]);
+    }
+    out << "\n";
     const auto devices = impl_->device_manager.devices();
     for (const auto& dev : devices) {
-        QStringList row;
+        bool first = true;
         for (const auto& key : cols) {
-            row << device_field_value(dev, key);
+            if (!first) out << ",";
+            out << escape_csv_field_qt(device_field_value(dev, key));
+            first = false;
         }
-        out << row.join(',') << "\n";
+        out << "\n";
     }
 
     impl_->lbl_status->setText("CSV exported");
@@ -1226,13 +1305,11 @@ void MainWindow::on_selection_changed()
 void MainWindow::on_device_found(const hiksadp::Device& device)
 {
     impl_->table->upsert_device(device);
-
-    auto all = impl_->table->all_devices();
-    impl_->device_manager.update_devices(all);
 }
 
 void MainWindow::on_scan_complete(const protocol::DiscoveryResult& result)
 {
+    impl_->device_manager.update_devices(result.devices);
     impl_->btn_scan->setEnabled(true);
     impl_->lbl_status->setText(QString("Scan complete: %1 device(s)").arg(result.responses_received));
     Logger::write(

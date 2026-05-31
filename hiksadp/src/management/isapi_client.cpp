@@ -9,6 +9,7 @@
 #include <QAuthenticator>
 
 #include "isapi_client.hpp"
+#include "management/security_question_reset.hpp"
 
 #include <array>
 #include <format>
@@ -16,6 +17,24 @@
 namespace hiksadp {
 
 // ── IsapiClient::Impl ──────────────────────────────────────────────────────
+namespace {
+std::string escape_xml_text(std::string_view in)
+{
+    std::string out;
+    out.reserve(in.size());
+    for (const char c : in) {
+        switch (c) {
+            case '&': out += "&amp;"; break;
+            case '<': out += "&lt;"; break;
+            case '>': out += "&gt;"; break;
+            case '"': out += "&quot;"; break;
+            case '\'': out += "&apos;"; break;
+            default: out.push_back(c); break;
+        }
+    }
+    return out;
+}
+} // namespace
 
 struct IsapiClient::Impl {
     std::unique_ptr<QNetworkAccessManager> nam;
@@ -64,7 +83,21 @@ struct IsapiClient::Impl {
 
         if (reply->error() != QNetworkReply::NoError) {
             const auto err_str = reply->errorString().toStdString();
+            const auto http_status = reply->attribute(
+                QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const auto body = reply->readAll().toStdString();
             reply->deleteLater();
+
+            if (http_status == 401) {
+                return make_error<IsapiResponse>(ErrorCode::AuthenticationFailed,
+                                                  "HTTP 401");
+            }
+            if (http_status > 0) {
+                IsapiResponse resp;
+                resp.status_code = http_status;
+                resp.body = body;
+                return make_ok(std::move(resp));
+            }
 
             if (reply->error() == QNetworkReply::ConnectionRefusedError ||
                 reply->error() == QNetworkReply::HostNotFoundError) {
@@ -326,6 +359,77 @@ Result<void> IsapiClient::change_password(const ChangePasswordRequest& req)
             "fitur change password tidak didukung pada endpoint ISAPI device ini");
     }
     return make_error<void>(ErrorCode::UnexpectedResponse,
+        last_detail.empty() ? std::format("HTTP {}", last_status) : last_detail);
+}
+
+Result<void> IsapiClient::reset_password_by_security_questions(const SecurityQuestionResetRequest& req)
+{
+    if (!is_valid_ip(req.ip.get())) {
+        return make_error<void>(ErrorCode::InvalidIpAddress, req.ip.get());
+    }
+    if (req.answer1.empty() || req.answer2.empty() || req.answer3.empty()) {
+        return make_error<void>(ErrorCode::EmptyInput, "jawaban security question tidak boleh kosong");
+    }
+    if (!is_strong_password(req.new_password.get())) {
+        return make_error<void>(ErrorCode::WeakPassword);
+    }
+
+    const auto a1 = escape_xml_text(req.answer1);
+    const auto a2 = escape_xml_text(req.answer2);
+    const auto a3 = escape_xml_text(req.answer3);
+    const auto new_password = escape_xml_text(req.new_password.get());
+
+    const std::string xml = std::format(
+        R"(<?xml version="1.0" encoding="UTF-8"?>)"
+        R"(<SecurityQuestionReset>)"
+        R"(<Question1Answer>{}</Question1Answer>)"
+        R"(<Question2Answer>{}</Question2Answer>)"
+        R"(<Question3Answer>{}</Question3Answer>)"
+        R"(<NewPassword>{}</NewPassword>)"
+        R"(</SecurityQuestionReset>)",
+        a1, a2, a3, new_password);
+
+    const std::array<std::string, 4> candidates{{
+        "/ISAPI/Security/resetPasswordBySecurityQuestion",
+        "/ISAPI/Security/resetPasswordByQuestion",
+        "/ISAPI/Security/passwordResetByQuestion",
+        "/ISAPI/Security/users/1/passwordReset",
+    }};
+
+    int last_status = 0;
+    std::string last_detail;
+
+    for (const auto& path : candidates) {
+        auto resp = http_put_noauth(req.ip, req.http_port, path, xml);
+        if (!resp) {
+            if (resp.error().code == ErrorCode::OperationTimeout ||
+                resp.error().code == ErrorCode::NetworkUnreachable) {
+                return std::unexpected(resp.error());
+            }
+            last_detail = resp.error().message();
+            continue;
+        }
+
+        last_status = resp.value().status_code;
+        const auto decision = classify_security_question_reset_response(resp.value());
+        if (decision == SecurityQuestionResetDecision::Success) return Result<void>{};
+        if (decision == SecurityQuestionResetDecision::AuthenticationFailed) {
+            return make_error<void>(ErrorCode::AuthenticationFailed, "security question reset ditolak");
+        }
+        if (decision == SecurityQuestionResetDecision::ContinueFallback) {
+            last_detail = std::format("HTTP {} body={}", resp.value().status_code, resp.value().body);
+            continue;
+        }
+        last_detail = std::format("HTTP {} body={}", resp.value().status_code, resp.value().body);
+    }
+
+    if (last_status == 404 || last_status == 405 || last_status == 501) {
+        return make_error<void>(
+            ErrorCode::UnexpectedResponse,
+            "security question reset endpoint tidak didukung device/firmware ini");
+    }
+    return make_error<void>(
+        ErrorCode::UnexpectedResponse,
         last_detail.empty() ? std::format("HTTP {}", last_status) : last_detail);
 }
 

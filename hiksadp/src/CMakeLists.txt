@@ -3,6 +3,8 @@ add_library(hiksadp_core STATIC
   core/types.hpp          # strong typedefs & domain primitives
   core/result.hpp         # Result<T,E> alias atas std::expected
   core/device.hpp         # Device struct & DeviceState variant
+  core/csv.hpp
+  core/csv.cpp
   core/logger.hpp
   core/logger.cpp
   core/device.cpp
@@ -28,6 +30,8 @@ target_link_libraries(hiksadp_protocol
 add_library(hiksadp_management STATIC
   management/isapi_client.hpp
   management/isapi_client.cpp
+  management/security_question_reset.hpp
+  management/security_question_reset.cpp
   management/password_reset_service.hpp
   management/password_reset_service.cpp
   management/device_manager.hpp
@@ -68,4 +72,8 @@ add_executable(hiksadp_gui
 
 target_link_libraries(hiksadp_gui
   PRIVATE hiksadp_ui hiksadp_management hiksadp_protocol Qt6::Widgets Qt6::Core Qt6::Network
+)
+
+install(TARGETS hiksadp_cli hiksadp_gui
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

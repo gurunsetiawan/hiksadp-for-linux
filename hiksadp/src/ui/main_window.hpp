@@ -1,9 +1,18 @@
 #pragma once
 
+#ifndef Q_MOC_RUN
 #include "management/device_manager.hpp"
 #include "protocol/sadp_discovery.hpp"
+#else
+namespace hiksadp {
+struct Device;
+struct MacAddress;
+namespace protocol { struct DiscoveryResult; }
+} // namespace hiksadp
+#endif
 
 #include <memory>
+#include <vector>
 
 // Qt forward declarations — menghindari include berat di header
 class QCloseEvent;

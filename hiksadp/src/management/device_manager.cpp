@@ -1,4 +1,5 @@
 #include "device_manager.hpp"
+#include "core/csv.hpp"
 #include <QByteArray>
 #include <QHostAddress>
 #include <QUdpSocket>
@@ -489,6 +490,38 @@ Result<void> DeviceManager::apply_password_reset_code(const MacAddress& mac,
     return send_sadp_reset_command(*dev, reset_code, new_password);
 }
 
+Result<void> DeviceManager::apply_password_reset_questions(const MacAddress& mac,
+                                                           const std::string& answer1,
+                                                           const std::string& answer2,
+                                                           const std::string& answer3,
+                                                           const Password& new_password)
+{
+    std::optional<Device> dev;
+    {
+        std::lock_guard lock{impl_->mutex};
+        dev = impl_->find_device(mac);
+    }
+    if (!dev) {
+        return make_error<void>(ErrorCode::DeviceNotFound, mac.get());
+    }
+    if (answer1.empty() || answer2.empty() || answer3.empty()) {
+        return make_error<void>(ErrorCode::EmptyInput, "jawaban security question tidak boleh kosong");
+    }
+    if (!is_strong_password(new_password.get())) {
+        return make_error<void>(ErrorCode::WeakPassword);
+    }
+
+    SecurityQuestionResetRequest req{
+        .ip = dev->network.ip,
+        .http_port = dev->network.http_port,
+        .answer1 = answer1,
+        .answer2 = answer2,
+        .answer3 = answer3,
+        .new_password = new_password,
+    };
+    return impl_->isapi.reset_password_by_security_questions(req);
+}
+
 // ── Export ─────────────────────────────────────────────────────────────────
 
 Result<std::string> DeviceManager::export_csv() const
@@ -498,19 +531,26 @@ Result<std::string> DeviceManager::export_csv() const
     ss << "IP Address,Subnet Mask,Gateway,HTTP Port,SDK Port,MAC Address,"
           "Serial Number,Model,Device Type,Firmware,DHCP,Status\n";
 
+    auto write_field = [&ss](const std::string& v, bool first) {
+        if (!first) ss << ",";
+        ss << escape_csv_field(v);
+    };
+
     for (const auto& [_, dev] : impl_->device_map) {
-        ss << dev.network.ip.get()          << ","
-           << dev.network.subnet_mask.get() << ","
-           << dev.network.gateway.get()     << ","
-           << dev.network.http_port.get()   << ","
-           << dev.network.sdk_port.get()    << ","
-           << dev.mac_address.get()         << ","
-           << dev.serial_number.get()       << ","
-           << dev.model                     << ","
-           << dev.device_type               << ","
-           << dev.firmware_version.get()    << ","
-           << (dev.network.dhcp_enabled ? "Yes" : "No") << ","
-           << dev.status_string()           << "\n";
+        bool first = true;
+        write_field(dev.network.ip.get(), first); first = false;
+        write_field(dev.network.subnet_mask.get(), first);
+        write_field(dev.network.gateway.get(), first);
+        write_field(std::to_string(dev.network.http_port.get()), first);
+        write_field(std::to_string(dev.network.sdk_port.get()), first);
+        write_field(dev.mac_address.get(), first);
+        write_field(dev.serial_number.get(), first);
+        write_field(dev.model, first);
+        write_field(dev.device_type, first);
+        write_field(dev.firmware_version.get(), first);
+        write_field(dev.network.dhcp_enabled ? "Yes" : "No", first);
+        write_field(dev.status_string(), first);
+        ss << "\n";
     }
     return make_ok(ss.str());
 }
