@@ -1,0 +1,138 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, contoh: v1.0.0"
+        required: true
+        type: string
+      prerelease:
+        description: "Tandai sebagai pre-release"
+        required: false
+        default: false
+        type: boolean
+      notes:
+        description: "Catatan tambahan untuk release"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            dpkg-dev \
+            g++ \
+            ninja-build \
+            qt6-base-dev
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            TAG="${INPUT_TAG}"
+            PRERELEASE="${INPUT_PRERELEASE}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+            PRERELEASE="false"
+          fi
+
+          if [[ ! "${TAG}" =~ ^v[0-9]+(\.[0-9]+)*([.-][A-Za-z0-9]+)*$ ]]; then
+            echo "Invalid release tag: ${TAG}" >&2
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "prerelease=${PRERELEASE}" >> "${GITHUB_OUTPUT}"
+
+      - name: Configure
+        run: cmake -S hiksadp -B hiksadp/build -G Ninja -DHIKSADP_PACKAGE_VERSION=${{ steps.meta.outputs.version }}
+
+      - name: Build
+        run: cmake --build hiksadp/build
+
+      - name: Test
+        run: ctest --test-dir hiksadp/build --output-on-failure
+
+      - name: Package
+        run: cpack --config hiksadp/build/CPackConfig.cmake
+
+      - name: Write release notes
+        shell: bash
+        env:
+          RELEASE_NOTES_INPUT: ${{ inputs.notes }}
+        run: |
+          cat > release-notes.md <<'NOTES'
+          ## HikSADP for Linux ${{ steps.meta.outputs.tag }}
+
+          Native Linux alternative for Hikvision SADP workflows.
+
+          ### Included artifacts
+          - `hiksadp-*.deb` for Debian/Ubuntu based systems.
+          - `hiksadp-*.tar.gz` generic archive.
+
+          ### Release comment
+          This release is generated automatically from GitHub Actions after build, smoke test, and CPack packaging pass.
+
+          ### Notes
+          - Discovery uses SADP multicast/broadcast.
+          - Device operations depend on firmware support for the relevant ISAPI/SADP endpoint.
+          - Security Questions reset includes fallback endpoints; unsupported firmware may still reject the flow.
+          NOTES
+
+          if [[ -n "${RELEASE_NOTES_INPUT}" ]]; then
+            {
+              echo
+              echo "### Maintainer comment"
+              printf '%s\n' "${RELEASE_NOTES_INPUT}"
+            } >> release-notes.md
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          TITLE="HikSADP for Linux ${TAG}"
+          PRERELEASE_ARGS=()
+          if [[ "${{ steps.meta.outputs.prerelease }}" == "true" ]]; then
+            PRERELEASE_ARGS=(--prerelease)
+          fi
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" \
+              --title "${TITLE}" \
+              --notes-file release-notes.md \
+              "${PRERELEASE_ARGS[@]}"
+            gh release upload "${TAG}" hiksadp-*.deb hiksadp-*.tar.gz --clobber
+          else
+            gh release create "${TAG}" \
+              hiksadp-*.deb \
+              hiksadp-*.tar.gz \
+              --title "${TITLE}" \
+              --notes-file release-notes.md \
+              --target "${GITHUB_SHA}" \
+              "${PRERELEASE_ARGS[@]}"
+          fi

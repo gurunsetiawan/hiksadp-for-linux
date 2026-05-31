@@ -70,6 +70,16 @@ Jalankan CLI:
 ./build/src/hiksadp_cli --help
 ```
 
+## Release
+Release GitHub dibuat otomatis saat push tag `v*`:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Workflow release juga bisa dijalankan manual dari GitHub Actions dengan input tag dan catatan tambahan.
+
 ## Catatan Operasional
 - Discovery bisa intermiten di jaringan ramai; aplikasi sudah memakai mekanisme stale/purge agar daftar device lebih stabil saat auto refresh.
 - Mekanisme update daftar device memakai hasil scan terbaru per siklus (`scan_complete`) agar stale/purge bekerja konsisten.
