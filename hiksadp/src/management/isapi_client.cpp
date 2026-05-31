@@ -9,6 +9,7 @@
 #include <QAuthenticator>
 
 #include "isapi_client.hpp"
+#include "management/security_question_reset.hpp"
 
 #include <array>
 #include <format>
@@ -410,17 +411,13 @@ Result<void> IsapiClient::reset_password_by_security_questions(const SecurityQue
         }
 
         last_status = resp.value().status_code;
-        if (resp.value().is_ok()) return Result<void>{};
-        if (resp.value().status_code == 400) {
-            return make_error<void>(ErrorCode::AuthenticationFailed,
-                                    "jawaban security question salah atau format payload tidak sesuai firmware");
-        }
-        if (resp.value().status_code == 401 || resp.value().status_code == 403) {
+        const auto decision = classify_security_question_reset_response(resp.value());
+        if (decision == SecurityQuestionResetDecision::Success) return Result<void>{};
+        if (decision == SecurityQuestionResetDecision::AuthenticationFailed) {
             return make_error<void>(ErrorCode::AuthenticationFailed, "security question reset ditolak");
         }
-        if (resp.value().status_code == 404 ||
-            resp.value().status_code == 405 ||
-            resp.value().status_code == 501) {
+        if (decision == SecurityQuestionResetDecision::ContinueFallback) {
+            last_detail = std::format("HTTP {} body={}", resp.value().status_code, resp.value().body);
             continue;
         }
         last_detail = std::format("HTTP {} body={}", resp.value().status_code, resp.value().body);

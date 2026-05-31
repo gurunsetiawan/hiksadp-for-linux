@@ -1,6 +1,7 @@
 #include "core/csv.hpp"
 #include "management/device_manager.hpp"
 #include "management/password_reset_service.hpp"
+#include "management/security_question_reset.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -112,6 +113,13 @@ int main()
         valid_dev.mac_address, "", "a2", "a3", Password{"Admin123!"});
     check(!empty_answer.has_value() && empty_answer.error().code == ErrorCode::EmptyInput,
           "security question reset rejects empty answer");
+
+    check(classify_security_question_reset_response(IsapiResponse{400, "<error>payload mismatch</error>"}) ==
+              SecurityQuestionResetDecision::ContinueFallback,
+          "security question 400 payload mismatch continues fallback");
+    check(classify_security_question_reset_response(IsapiResponse{400, "<error>wrong answer</error>"}) ==
+              SecurityQuestionResetDecision::AuthenticationFailed,
+          "security question 400 wrong answer stops as auth failure");
 
     PasswordResetService prs;
     const std::string xml =

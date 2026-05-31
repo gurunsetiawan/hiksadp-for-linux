@@ -14,7 +14,9 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QMetaObject>
 #include <QPushButton>
+#include <QPointer>
 #include <QComboBox>
 #include <QCheckBox>
 #include <QDialog>
@@ -32,6 +34,7 @@
 #include <QWidget>
 #include <chrono>
 #include <format>
+#include <thread>
 
 namespace hiksadp::ui {
 
@@ -63,6 +66,7 @@ struct MainWindow::Impl {
     DeviceManager device_manager;
     PasswordResetService password_reset_service;
     protocol::SadpDiscovery scanner;
+    std::vector<std::jthread> workers;
 };
 
 static QString format_device_detail_text(const Device& dev)
@@ -1041,19 +1045,41 @@ void MainWindow::on_password_reset_clicked()
             QMessageBox::No);
         if (confirm != QMessageBox::Yes) return;
 
-        const auto result = impl_->device_manager.apply_password_reset_questions(
-            macs.front(),
-            a1.trimmed().toStdString(),
-            a2.trimmed().toStdString(),
-            a3.trimmed().toStdString(),
-            Password{new_password.toStdString()});
-        if (!result) {
-            show_error("Security Questions Reset Failed", QString::fromStdString(result.error().message()));
-            impl_->lbl_status->setText("Security questions reset failed");
-            return;
-        }
-        show_info("Security Questions Reset", "Password reset berhasil via security questions.");
-        impl_->lbl_status->setText("Security questions reset success");
+        const auto mac = macs.front();
+        const auto answer1 = a1.trimmed().toStdString();
+        const auto answer2 = a2.trimmed().toStdString();
+        const auto answer3 = a3.trimmed().toStdString();
+        const auto password = Password{new_password.toStdString()};
+
+        impl_->btn_password_reset->setEnabled(false);
+        impl_->lbl_status->setText("Security questions reset running...");
+
+        auto* manager = &impl_->device_manager;
+        const QPointer<MainWindow> self{this};
+        impl_->workers.emplace_back([self, manager, mac, answer1, answer2, answer3, password] {
+            auto result = manager->apply_password_reset_questions(
+                mac, answer1, answer2, answer3, password);
+
+            if (!self) return;
+            QMetaObject::invokeMethod(
+                self.data(),
+                [self, result = std::move(result)]() mutable {
+                    if (!self) return;
+                    self->update_action_states();
+                    if (!result) {
+                        self->show_error(
+                            "Security Questions Reset Failed",
+                            QString::fromStdString(result.error().message()));
+                        self->impl_->lbl_status->setText("Security questions reset failed");
+                        return;
+                    }
+                    self->show_info(
+                        "Security Questions Reset",
+                        "Password reset berhasil via security questions.");
+                    self->impl_->lbl_status->setText("Security questions reset success");
+                },
+                Qt::QueuedConnection);
+        });
         return;
     }
 
