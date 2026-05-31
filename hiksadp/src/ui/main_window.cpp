@@ -2,6 +2,7 @@
 
 #include "core/logger.hpp"
 #include "core/csv.hpp"
+#include "management/isapi_client.hpp"
 #include "management/password_reset_service.hpp"
 #include "ui/device_table.hpp"
 
@@ -66,7 +67,6 @@ struct MainWindow::Impl {
     DeviceManager device_manager;
     PasswordResetService password_reset_service;
     protocol::SadpDiscovery scanner;
-    std::vector<std::jthread> workers;
 };
 
 static QString format_device_detail_text(const Device& dev)
@@ -1045,20 +1045,33 @@ void MainWindow::on_password_reset_clicked()
             QMessageBox::No);
         if (confirm != QMessageBox::Yes) return;
 
-        const auto mac = macs.front();
+        const auto target = impl_->device_manager.find_by_mac(macs.front());
+        if (!target) {
+            show_error("Security Questions Reset Failed", "Device tidak ditemukan.");
+            return;
+        }
+
         const auto answer1 = a1.trimmed().toStdString();
         const auto answer2 = a2.trimmed().toStdString();
         const auto answer3 = a3.trimmed().toStdString();
         const auto password = Password{new_password.toStdString()};
+        const SecurityQuestionResetRequest req{
+            .ip = target->network.ip,
+            .http_port = target->network.http_port,
+            .answer1 = answer1,
+            .answer2 = answer2,
+            .answer3 = answer3,
+            .new_password = password,
+        };
 
         impl_->btn_password_reset->setEnabled(false);
         impl_->lbl_status->setText("Security questions reset running...");
 
-        auto* manager = &impl_->device_manager;
         const QPointer<MainWindow> self{this};
-        impl_->workers.emplace_back([self, manager, mac, answer1, answer2, answer3, password] {
-            auto result = manager->apply_password_reset_questions(
-                mac, answer1, answer2, answer3, password);
+        std::thread{[self, req] {
+            // QNetworkAccessManager is thread-affine, so each worker owns its client.
+            IsapiClient client;
+            auto result = client.reset_password_by_security_questions(req);
 
             if (!self) return;
             QMetaObject::invokeMethod(
@@ -1079,7 +1092,7 @@ void MainWindow::on_password_reset_clicked()
                     self->impl_->lbl_status->setText("Security questions reset success");
                 },
                 Qt::QueuedConnection);
-        });
+        }}.detach();
         return;
     }
 
