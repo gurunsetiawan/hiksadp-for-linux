@@ -1,6 +1,14 @@
 #pragma once
 
+#ifndef Q_MOC_RUN
 #include "core/device.hpp"
+#else
+namespace hiksadp {
+struct Device;
+struct MacAddress;
+} // namespace hiksadp
+#endif
+
 #include <QTableWidget>
 #include <vector>
 
