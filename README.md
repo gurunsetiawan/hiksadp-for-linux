@@ -26,6 +26,10 @@ HikSADP for Linux adalah aplikasi desktop Linux untuk discovery dan manajemen da
   - export request XML
   - import response XML
   - apply security code ke device.
+- Password reset via Security Questions (in-app flow):
+  - input 3 jawaban
+  - set password baru
+  - submit ke endpoint ISAPI fallback (tergantung dukungan firmware).
 - Export CSV/XML.
 - Open web login device.
 
@@ -53,6 +57,7 @@ cd hiksadp
 cmake -S . -B build
 cmake --build build -j
 ctest --test-dir build --output-on-failure
+cpack --config build/CPackConfig.cmake
 ```
 
 Jalankan GUI:
@@ -73,7 +78,7 @@ Jalankan CLI:
   - GUI/CLI: `QStandardPaths::AppDataLocation/hiksadp.log`.
 
 ## Roadmap Berikutnya
-- Security Questions flow end-to-end (per firmware/model matrix).
+- Hardening matrix Security Questions per firmware/model (karena endpoint bisa beda antar device).
 - Embedded webview opsional (UI convenience, bukan bypass routing).
 
 ## Lisensi

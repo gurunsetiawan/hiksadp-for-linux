@@ -71,3 +71,7 @@ add_executable(hiksadp_gui
 target_link_libraries(hiksadp_gui
   PRIVATE hiksadp_ui hiksadp_management hiksadp_protocol Qt6::Widgets Qt6::Core Qt6::Network
 )
+
+install(TARGETS hiksadp_cli hiksadp_gui
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)

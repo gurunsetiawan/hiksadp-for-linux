@@ -29,3 +29,14 @@ jobs:
 
       - name: Test
         run: ctest --test-dir hiksadp/build --output-on-failure
+
+      - name: Package
+        run: cpack --config hiksadp/build/CPackConfig.cmake
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: hiksadp-packages
+          path: |
+            hiksadp-*.tar.gz
+            hiksadp-*.deb

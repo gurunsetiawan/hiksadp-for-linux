@@ -490,6 +490,38 @@ Result<void> DeviceManager::apply_password_reset_code(const MacAddress& mac,
     return send_sadp_reset_command(*dev, reset_code, new_password);
 }
 
+Result<void> DeviceManager::apply_password_reset_questions(const MacAddress& mac,
+                                                           const std::string& answer1,
+                                                           const std::string& answer2,
+                                                           const std::string& answer3,
+                                                           const Password& new_password)
+{
+    std::optional<Device> dev;
+    {
+        std::lock_guard lock{impl_->mutex};
+        dev = impl_->find_device(mac);
+    }
+    if (!dev) {
+        return make_error<void>(ErrorCode::DeviceNotFound, mac.get());
+    }
+    if (answer1.empty() || answer2.empty() || answer3.empty()) {
+        return make_error<void>(ErrorCode::EmptyInput, "jawaban security question tidak boleh kosong");
+    }
+    if (!is_strong_password(new_password.get())) {
+        return make_error<void>(ErrorCode::WeakPassword);
+    }
+
+    SecurityQuestionResetRequest req{
+        .ip = dev->network.ip,
+        .http_port = dev->network.http_port,
+        .answer1 = answer1,
+        .answer2 = answer2,
+        .answer3 = answer3,
+        .new_password = new_password,
+    };
+    return impl_->isapi.reset_password_by_security_questions(req);
+}
+
 // ── Export ─────────────────────────────────────────────────────────────────
 
 Result<std::string> DeviceManager::export_csv() const

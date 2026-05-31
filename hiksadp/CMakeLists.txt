@@ -9,6 +9,7 @@ project(
 
 include(CTest)
 enable_testing()
+include(GNUInstallDirs)
 
 # ── C++23 standard, mandatory ──────────────────────────────────────────────
 set(CMAKE_CXX_STANDARD 23)
@@ -42,4 +43,18 @@ option(HIKSADP_BUILD_TESTS "Build unit tests" ON)
 add_subdirectory(src)
 if(HIKSADP_BUILD_TESTS)
   add_subdirectory(tests)
+endif()
+
+option(HIKSADP_ENABLE_PACKAGING "Enable CPack packaging" ON)
+if(HIKSADP_ENABLE_PACKAGING)
+  set(CPACK_PACKAGE_NAME "hiksadp")
+  set(CPACK_PACKAGE_VENDOR "gurunsetiawan")
+  set(CPACK_PACKAGE_CONTACT "maintainer@local")
+  set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "HikSADP Linux - Hikvision SADP alternative")
+  set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+  set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
+  set(CPACK_GENERATOR "TGZ;DEB")
+  set(CPACK_DEBIAN_PACKAGE_SECTION "net")
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt6core6, libqt6network6, libqt6widgets6")
+  include(CPack)
 endif()

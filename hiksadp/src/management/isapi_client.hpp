@@ -51,6 +51,15 @@ struct ChangePasswordRequest {
     Password        new_password;
 };
 
+struct SecurityQuestionResetRequest {
+    IpAddress ip;
+    Port      http_port{ports::HTTP_DEFAULT};
+    std::string answer1;
+    std::string answer2;
+    std::string answer3;
+    Password    new_password;
+};
+
 // ── IsapiClient — semua komunikasi ke device via HTTP ─────────────────────
 //
 // Setiap method mengembalikan Result<T> — caller wajib handle error.
@@ -94,6 +103,9 @@ public:
     // Endpoint umum: PUT /ISAPI/Security/users/1
     [[nodiscard]] Result<void>
     change_password(const ChangePasswordRequest& req);
+
+    [[nodiscard]] Result<void>
+    reset_password_by_security_questions(const SecurityQuestionResetRequest& req);
 
     // ── Cek apakah device aktif (bisa untuk polling status) ───────────────
     [[nodiscard]] Result<bool>

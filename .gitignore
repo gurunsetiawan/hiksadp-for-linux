@@ -5,3 +5,8 @@ hikvision_sadp_linux_project_plan.svg
 
 # Build artifacts
 hiksadp/build/
+
+# Local package artifacts
+_CPack_Packages/
+hiksadp-*.deb
+hiksadp-*.tar.gz

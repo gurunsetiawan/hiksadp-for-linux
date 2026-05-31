@@ -1004,28 +1004,56 @@ void MainWindow::on_password_reset_clicked()
     if (!ok || chosen.isEmpty()) return;
 
     if (chosen == "Security Questions (device-side)") {
-        const auto open_now = QMessageBox::question(
+        if (!supports_security_questions) {
+            show_info(
+                "Security Questions",
+                "Mode security questions tidak terdeteksi dari respons SADP.\n"
+                "Tetap bisa mencoba flow ini, tetapi mungkin ditolak oleh firmware.");
+        }
+
+        bool q1_ok = false;
+        bool q2_ok = false;
+        bool q3_ok = false;
+        bool np_ok = false;
+
+        const auto a1 = QInputDialog::getText(
+            this, "Security Question 1", "Jawaban pertanyaan keamanan #1:",
+            QLineEdit::Normal, {}, &q1_ok);
+        if (!q1_ok) return;
+        const auto a2 = QInputDialog::getText(
+            this, "Security Question 2", "Jawaban pertanyaan keamanan #2:",
+            QLineEdit::Normal, {}, &q2_ok);
+        if (!q2_ok) return;
+        const auto a3 = QInputDialog::getText(
+            this, "Security Question 3", "Jawaban pertanyaan keamanan #3:",
+            QLineEdit::Normal, {}, &q3_ok);
+        if (!q3_ok) return;
+        const auto new_password = QInputDialog::getText(
+            this, "New Admin Password", "Password admin baru:",
+            QLineEdit::Password, {}, &np_ok);
+        if (!np_ok || new_password.isEmpty()) return;
+
+        const auto confirm = QMessageBox::question(
             this,
-            "Security Questions",
-            "Flow security questions dilakukan di web/local GUI device.\n"
-            "Buka web login device sekarang?",
+            "Confirm Security Questions Reset",
+            "Apply reset password via security questions sekarang?",
             QMessageBox::Yes | QMessageBox::No,
-            QMessageBox::Yes);
-        if (open_now == QMessageBox::Yes) {
-            on_open_web_clicked();
+            QMessageBox::No);
+        if (confirm != QMessageBox::Yes) return;
+
+        const auto result = impl_->device_manager.apply_password_reset_questions(
+            macs.front(),
+            a1.trimmed().toStdString(),
+            a2.trimmed().toStdString(),
+            a3.trimmed().toStdString(),
+            Password{new_password.toStdString()});
+        if (!result) {
+            show_error("Security Questions Reset Failed", QString::fromStdString(result.error().message()));
+            impl_->lbl_status->setText("Security questions reset failed");
+            return;
         }
-        if (supports_security_questions) {
-            show_info(
-                "Security Questions",
-                "Device terdeteksi mendukung security questions.\n"
-                "Untuk saat ini, jalankan flow ini dari UI web/local GUI resmi device.\n"
-                "Integrasi question-answer langsung dari aplikasi ini belum diimplementasikan.");
-        } else {
-            show_info(
-                "Security Questions",
-                "Dari respons SADP, mode security questions tidak terdeteksi pada device ini.\n"
-                "Coba metode XML/security code atau change password (jika masih tahu password lama).");
-        }
+        show_info("Security Questions Reset", "Password reset berhasil via security questions.");
+        impl_->lbl_status->setText("Security questions reset success");
         return;
     }
 
