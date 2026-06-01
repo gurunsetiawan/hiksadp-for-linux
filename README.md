@@ -5,6 +5,7 @@
 [![UI](https://img.shields.io/badge/UI-Qt6-41CD52)](https://www.qt.io/)
 [![Build](https://img.shields.io/badge/build-CMake-064F8C)](https://cmake.org/)
 [![Status](https://img.shields.io/badge/status-active-success)](#)
+[![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![CI](https://github.com/gurunsetiawan/hiksadp-for-linux/actions/workflows/ci.yml/badge.svg)](https://github.com/gurunsetiawan/hiksadp-for-linux/actions/workflows/ci.yml)
 
 HikSADP for Linux adalah aplikasi desktop Linux untuk discovery dan manajemen dasar perangkat Hikvision (kamera, NVR, DVR) dengan scope setara SADP tool.
@@ -94,4 +95,4 @@ Workflow release juga bisa dijalankan manual dari GitHub Actions dengan input ta
 - Embedded webview opsional (UI convenience, bukan bypass routing).
 
 ## Lisensi
-Internal project / sesuai kebijakan pemilik repository.
+GPLv3. Lihat [LICENSE](LICENSE).
