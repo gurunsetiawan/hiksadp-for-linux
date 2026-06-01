@@ -3,6 +3,17 @@ HikSADP_Linux_PRD_v1.0.docx
 hiksadp_phase1.zip
 hikvision_sadp_linux_project_plan.svg
 
+# Local secrets/config
+.env
+.env.*
+!.env.example
+*.local
+*.secret
+*.key
+*.pem
+*.p12
+*.pfx
+
 # Build artifacts
 hiksadp/build*/
 
@@ -10,3 +21,7 @@ hiksadp/build*/
 _CPack_Packages/
 hiksadp-*.deb
 hiksadp-*.tar.gz
+
+# Runtime artifacts
+*.log
+logs/
